@@ -1,47 +1,65 @@
 <template>
   <div class="result-panel">
     <div class="result-header">
-      <el-button type="primary" :icon="RefreshRight" @click="handleRefresh" :disabled="!previewHtml || isPreviewLoading">
+      <el-button type="primary" :icon="RefreshRight" @click="handleRefresh" :disabled="!hasContent || isPreviewLoading">
         <span v-if="isPreviewLoading">编译中...</span>
         <span v-else>刷新预览</span>
       </el-button>
       <el-tag v-if="isModified" type="warning" size="small">代码已修改</el-tag>
       <el-tag v-if="previewError" type="danger" size="small">预览错误</el-tag>
+
+      <!-- 预览模式切换 -->
+      <el-radio-group v-model="previewMode" size="small" style="margin-left: auto">
+        <el-radio-button value="browser">浏览器编译</el-radio-button>
+        <el-radio-button value="webcontainer">WebContainer</el-radio-button>
+      </el-radio-group>
     </div>
+
     <el-tabs v-model="activeTab" class="result-tabs">
       <el-tab-pane label="Preview" name="preview">
         <div class="preview-container">
-          <!-- 错误提示 -->
-          <div v-if="previewError" class="error-overlay">
-            <el-alert type="error" :closable="false" show-icon>
-              <template #title>编译错误</template>
-              <pre>{{ previewError }}</pre>
-            </el-alert>
-          </div>
+          <!-- WebContainer 预览模式 -->
+          <WebContainerPreview
+            v-if="previewMode === 'webcontainer'"
+            ref="webcontainerPreviewRef"
+            :page-content="pageContent"
+            template="element-plus"
+          />
 
-          <!-- 加载状态 -->
-          <div v-else-if="isPreviewLoading && !previewHtml" class="loading-overlay">
-            <el-icon class="loading-icon"><Loading /></el-icon>
-            <span>正在编译预览...</span>
-          </div>
+          <!-- 浏览器编译预览模式（原有逻辑） -->
+          <template v-else>
+            <!-- 错误提示 -->
+            <div v-if="previewError" class="error-overlay">
+              <el-alert type="error" :closable="false" show-icon>
+                <template #title>编译错误</template>
+                <pre>{{ previewError }}</pre>
+              </el-alert>
+            </div>
 
-          <!-- 预览 iframe -->
-          <div v-else-if="previewHtml" class="preview-frame">
-            <iframe
-              ref="previewIframe"
-              :key="iframeKey"
-              :srcdoc="previewHtml"
-              sandbox="allow-scripts allow-same-origin"
-              @load="handleIframeLoad"
-            ></iframe>
-          </div>
+            <!-- 加载状态 -->
+            <div v-else-if="isPreviewLoading && !previewHtml" class="loading-overlay">
+              <el-icon class="loading-icon"><Loading /></el-icon>
+              <span>正在编译预览...</span>
+            </div>
 
-          <!-- 空状态 -->
-          <el-empty v-else description="生成代码后显示预览" :image-size="80">
-            <template #image>
-              <span style="font-size: 48px">🎨</span>
-            </template>
-          </el-empty>
+            <!-- 预览 iframe -->
+            <div v-else-if="previewHtml" class="preview-frame">
+              <iframe
+                ref="previewIframe"
+                :key="iframeKey"
+                :srcdoc="previewHtml"
+                sandbox="allow-scripts allow-same-origin"
+                @load="handleIframeLoad"
+              ></iframe>
+            </div>
+
+            <!-- 空状态 -->
+            <el-empty v-else description="生成代码后显示预览" :image-size="80">
+              <template #image>
+                <span style="font-size: 48px">🎨</span>
+              </template>
+            </el-empty>
+          </template>
         </div>
       </el-tab-pane>
 
@@ -90,19 +108,24 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { CopyDocument, RefreshRight, Loading } from '@element-plus/icons-vue'
 import { useProjectStore } from '@/stores/project'
+import { useWebContainerStore } from '@/stores/webcontainer'
 import MonacoEditor from '@/components/MonacoEditor.vue'
 import FileTreeItem from '@/components/FileTree.vue'
+import WebContainerPreview from '@/components/WebContainerPreview.vue'
 import type { ProjectFile } from '@/types'
 
 const projectStore = useProjectStore()
+const webcontainerStore = useWebContainerStore()
 
 const activeTab = ref('preview')
+const previewMode = ref<'browser' | 'webcontainer'>('browser')
 const iframeKey = ref(0)
 const previewIframe = ref<HTMLIFrameElement | null>(null)
+const webcontainerPreviewRef = ref<InstanceType<typeof WebContainerPreview> | null>(null)
 
 const files = computed(() => projectStore.files)
 const selectedFileId = computed(() => projectStore.selectedFileId)
@@ -111,6 +134,16 @@ const previewHtml = computed(() => projectStore.previewHtml)
 const isPreviewLoading = computed(() => projectStore.isPreviewLoading)
 const previewError = computed(() => projectStore.previewError)
 const isModified = computed(() => projectStore.isModified)
+
+// 获取 Page.vue 内容
+const pageContent = computed(() => {
+  const pageFile = findFileByPath(files.value, '/src/Page.vue')
+  return pageFile?.content || ''
+})
+
+const hasContent = computed(() => {
+  return pageContent.value.length > 0 || previewHtml.value.length > 0
+})
 
 const fileCount = computed(() => {
   let count = 0
@@ -123,6 +156,18 @@ const fileCount = computed(() => {
   countFiles(files.value)
   return count
 })
+
+// 根据路径查找文件
+function findFileByPath(files: ProjectFile[], path: string): ProjectFile | null {
+  for (const file of files) {
+    if (file.path === path) return file
+    if (file.children) {
+      const found = findFileByPath(file.children, path)
+      if (found) return found
+    }
+  }
+  return null
+}
 
 function handleSelectFile(file: ProjectFile) {
   projectStore.selectFile(file.id)
@@ -142,19 +187,28 @@ function copyCode() {
 }
 
 function handleRefresh() {
-  // 立即重新生成预览（不走防抖）
-  projectStore.regeneratePreview()
-  // 通过改变iframe的key来强制刷新
-  iframeKey.value++
+  if (previewMode.value === 'webcontainer') {
+    // WebContainer 模式
+    webcontainerPreviewRef.value?.reload()
+  } else {
+    // 浏览器编译模式
+    projectStore.regeneratePreview()
+    iframeKey.value++
+  }
   ElMessage.success('预览已刷新')
 }
 
 function handleIframeLoad() {
   // iframe 加载完成
-  if (projectStore.isPreviewLoading) {
-    // loading 状态会在 store 中自动更新
-  }
 }
+
+// 监听 previewMode 变化
+watch(previewMode, async (newMode) => {
+  if (newMode === 'webcontainer' && pageContent.value) {
+    // 切换到 WebContainer 模式时，如果有内容则初始化
+    await webcontainerPreviewRef.value?.init()
+  }
+})
 
 // 监听来自 iframe 的错误消息
 window.addEventListener('message', (event) => {

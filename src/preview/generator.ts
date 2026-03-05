@@ -292,7 +292,7 @@ export function generatePreviewHtml(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${title}</title>
-  <link rel="stylesheet" href="https://unpkg.com/element-plus@2.9.1/dist/index.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/element-plus@2.9.1/dist/index.css">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -346,51 +346,98 @@ export function generatePreviewHtml(
     </div>
   </div>
 
-  <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
-  <script src="https://unpkg.com/element-plus@2.9.1/dist/index.full.min.js"></script>
-  <script src="https://unpkg.com/@element-plus/icons-vue@2.3.2/dist/index.iife.min.js"></script>
-
   <script>
+    // 脚本加载器，支持回退
+    function loadScript(src, fallbackSrc) {
+      return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src;
+        script.onload = resolve;
+        script.onerror = () => {
+          if (fallbackSrc) {
+            const fallback = document.createElement('script');
+            fallback.src = fallbackSrc;
+            fallback.onload = resolve;
+            fallback.onerror = reject;
+            document.head.appendChild(fallback);
+          } else {
+            reject(new Error('Failed to load: ' + src));
+          }
+        };
+        document.head.appendChild(script);
+      });
+    }
+
+    // 显示错误
+    function showError(msg) {
+      const container = document.getElementById('error-container');
+      container.textContent = msg;
+      container.style.display = 'block';
+    }
+
     window.onerror = function(msg, url, line, col, error) {
-      const container = document.getElementById('error-container')
-      container.textContent = 'Error: ' + msg + '\\n  at ' + url + ':' + line
-      container.style.display = 'block'
-      console.error('Preview Error:', msg, url, line, col, error)
-      return true
+      showError('Error: ' + msg + '\\n  at ' + url + ':' + line);
+      console.error('Preview Error:', msg, url, line, col, error);
+      return true;
     }
 
     window.addEventListener('unhandledrejection', function(event) {
-      const container = document.getElementById('error-container')
-      container.textContent = 'Promise Error: ' + event.reason
-      container.style.display = 'block'
-      console.error('Unhandled Promise Error:', event.reason)
-    })
+      showError('Promise Error: ' + event.reason);
+      console.error('Unhandled Promise Error:', event.reason);
+    });
 
-    try {
-      const Vue = window.Vue
-      const ElementPlus = window.ElementPlus
-      const ElementPlusIconsVue = window.ElementPlusIconsVue
+    // 加载依赖并初始化应用
+    async function init() {
+      try {
+        // 加载 Vue
+        await loadScript(
+          'https://cdn.jsdelivr.net/npm/vue@3.5.13/dist/vue.global.prod.js',
+          'https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js'
+        );
 
-      const app = Vue.createApp({})
-      app.config.compilerOptions.isCustomElement = () => false
-      app.use(ElementPlus)
+        // 加载 Element Plus
+        await loadScript(
+          'https://cdn.jsdelivr.net/npm/element-plus@2.9.1/dist/index.full.min.js',
+          'https://unpkg.com/element-plus@2.9.1/dist/index.full.min.js'
+        );
 
-      for (const [key, component] of Object.entries(ElementPlusIconsVue || {})) {
-        app.component(key, component)
+        // 加载 Element Plus Icons（可选，失败不影响主要功能）
+        try {
+          await loadScript(
+            'https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.2/dist/index.iife.min.js',
+            'https://unpkg.com/@element-plus/icons-vue@2.3.2/dist/index.iife.min.js'
+          );
+        } catch (e) {
+          console.warn('Failed to load Element Plus icons:', e);
+        }
+
+        // 初始化应用
+        const Vue = window.Vue;
+        const ElementPlus = window.ElementPlus;
+        const ElementPlusIconsVue = window.ElementPlusIconsVue || {};
+
+        const app = Vue.createApp({});
+        app.config.compilerOptions.isCustomElement = () => false;
+        app.use(ElementPlus);
+
+        // 注册图标组件
+        for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+          app.component(key, component);
+        }
+
+        ${componentCodes}
+
+        ${appCode}
+
+        app.mount('#app');
+
+      } catch (error) {
+        showError('Failed to load dependencies: ' + error.message);
+        console.error('Init Error:', error);
       }
-
-      ${componentCodes}
-
-      ${appCode}
-
-      app.mount('#app')
-
-    } catch (error) {
-      const container = document.getElementById('error-container')
-      container.textContent = 'Compilation Error: ' + error.message + '\\n\\n' + (error.stack || '')
-      container.style.display = 'block'
-      console.error('Compilation Error:', error)
     }
+
+    init();
   </script>
 </body>
 </html>`
