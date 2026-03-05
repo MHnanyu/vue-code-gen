@@ -1,37 +1,43 @@
 ﻿<template>
   <div class="generator-view">
-    <div class="panel input-panel">
-      <div class="panel-header">
-        <h2>📝 需求描述</h2>
-        <div class="lib-badge">{{ currentLib }}</div>
-      </div>
-      <textarea
+    <el-card class="panel input-panel" shadow="hover">
+      <template #header>
+        <div class="panel-header">
+          <span>📝 需求描述</span>
+          <el-tag type="info">{{ currentLib }}</el-tag>
+        </div>
+      </template>
+      <el-input
         v-model="store.prompt"
-        placeholder="描述你想要生成的Vue组件..."
-        rows="6"
-      ></textarea>
+        type="textarea"
+        :rows="6"
+        placeholder="描述你想要生成的页面原型..."
+        resize="none"
+      />
       <div class="actions">
-        <button class="btn-primary" @click="generateCode" :disabled="store.isGenerating">
+        <el-button
+          type="success"
+          :loading="store.isGenerating"
+          @click="generateCode"
+        >
           {{ store.isGenerating ? '生成中...' : '生成代码' }}
-        </button>
-        <button class="btn-secondary" @click="copyCode" :disabled="!store.currentFile">
+        </el-button>
+        <el-button @click="copyCode" :disabled="!store.currentFile">
           复制代码
-        </button>
+        </el-button>
       </div>
-    </div>
-    
-    <div class="panel code-panel">
-      <div class="tabs" v-if="store.hasFiles">
-        <button
+    </el-card>
+
+    <el-card class="panel code-panel" shadow="hover">
+      <el-tabs v-if="store.hasFiles" v-model="activeTabId" class="file-tabs">
+        <el-tab-pane
           v-for="file in store.generatedFiles"
           :key="file.id"
-          :class="['tab', { active: store.currentFile?.id === file.id }]"
-          @click="store.selectFile(file.id)"
-        >
-          {{ file.filename }}
-        </button>
-      </div>
-      
+          :label="file.filename"
+          :name="file.id"
+        />
+      </el-tabs>
+
       <div class="editor-container" v-if="store.currentFile">
         <MonacoEditor
           :value="store.currentFile.content"
@@ -39,36 +45,49 @@
           @update:value="(v: string) => store.updateFileContent(store.currentFile!.id, v)"
         />
       </div>
-      
-      <div class="empty-state" v-else>
-        <div class="empty-icon">📄</div>
-        <p>在左侧输入需求，点击生成代码</p>
-      </div>
-    </div>
-    
-    <div class="panel preview-panel">
-      <div class="panel-header">
-        <h2>👁️ 实时预览</h2>
-      </div>
+
+      <el-empty v-else description="在左侧输入需求，点击生成原型" :image-size="80">
+        <template #image>
+          <span style="font-size: 48px">📄</span>
+        </template>
+      </el-empty>
+    </el-card>
+
+    <el-card class="panel preview-panel" shadow="hover">
+      <template #header>
+        <span>👁️ 实时预览</span>
+      </template>
       <div class="preview-frame" v-if="store.currentFile">
         <iframe :srcdoc="previewHtml" sandbox="allow-scripts"></iframe>
       </div>
-      <div class="empty-state" v-else>
-        <div class="empty-icon">🎨</div>
-        <p>生成代码后显示预览</p>
-      </div>
-    </div>
+      <el-empty v-else description="生成代码后显示预览" :image-size="80">
+        <template #image>
+          <span style="font-size: 48px">🎨</span>
+        </template>
+      </el-empty>
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
+import { ElMessage } from 'element-plus'
 import { useGeneratorStore } from '@/stores/generator'
 import MonacoEditor from '@/components/MonacoEditor.vue'
 
 const route = useRoute()
 const store = useGeneratorStore()
+
+const activeTabId = ref<string>('')
+
+watch(() => store.currentFile, (file) => {
+  if (file) activeTabId.value = file.id
+}, { immediate: true })
+
+watch(activeTabId, (id) => {
+  if (id) store.selectFile(id)
+})
 
 const currentLib = computed(() => (route.query.lib as string) || 'ElementUI')
 
@@ -89,14 +108,12 @@ const previewHtml = computed(() => {
 async function generateCode() {
   if (!store.prompt.trim()) return
   store.setGenerating(true)
-  
+
   setTimeout(() => {
     store.addFile({
-      id: Date.now().toString(),
       filename: 'GeneratedComponent.vue',
       content: getExampleCode(currentLib.value),
-      language: 'vue',
-      createdAt: new Date()
+      language: 'vue'
     })
     store.setGenerating(false)
     store.saveToHistory()
@@ -120,7 +137,7 @@ const searchText = ref('')
 const users = ref([])
 const columns = [{ title: '姓名', dataIndex: 'name' }]
 function handleAdd() {}
-<\/script>
+\x3C/script>
 <style scoped>.user-management { padding: 24px; }</style>`
   }
   return `<template>
@@ -139,13 +156,14 @@ function handleAdd() {}
 import { ref } from 'vue'
 const searchText = ref('')
 const users = ref([])
-<\/script>
+\x3C/script>
 <style scoped>.user-management { padding: 24px; }</style>`
 }
 
 function copyCode() {
   if (store.currentFile) {
     navigator.clipboard.writeText(store.currentFile.content)
+    ElMessage.success('代码已复制到剪贴板')
   }
 }
 </script>
@@ -159,35 +177,78 @@ function copyCode() {
   padding: 16px;
   background: #f0f2f5;
 }
+
 .panel {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
+
+.input-panel :deep(.el-card__body) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 16px;
-  border-bottom: 1px solid #f0f0f0;
 }
-.panel-header h2 { margin: 0; font-size: 16px; }
-.lib-badge { background: #e6f7ff; color: #1890ff; padding: 4px 12px; border-radius: 4px; font-size: 12px; }
-.input-panel { padding: 16px; }
-.input-panel textarea { flex: 1; resize: none; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px; font-size: 14px; margin-bottom: 16px; }
-.actions { display: flex; gap: 8px; }
-.btn-primary { background: #42b883; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; flex: 1; }
-.btn-primary:disabled { background: #ccc; cursor: not-allowed; }
-.btn-secondary { background: white; border: 1px solid #ddd; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
-.tabs { display: flex; gap: 4px; padding: 8px 12px; background: #fafafa; border-bottom: 1px solid #f0f0f0; }
-.tab { background: transparent; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 13px; color: #666; }
-.tab.active { background: #42b883; color: white; }
-.editor-container { flex: 1; overflow: hidden; }
-.preview-frame { flex: 1; padding: 16px; background: #f5f5f5; overflow: auto; }
-.preview-frame iframe { width: 100%; height: 100%; border: none; background: white; border-radius: 4px; }
-.empty-state { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #999; }
-.empty-icon { font-size: 48px; margin-bottom: 16px; }
+
+.actions {
+  display: flex;
+  gap: 8px;
+}
+
+.code-panel :deep(.el-card__body) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+
+.file-tabs {
+  --el-tabs-header-height: 40px;
+}
+
+.file-tabs :deep(.el-tabs__header) {
+  margin: 0;
+  padding: 0 12px;
+  background: #fafafa;
+}
+
+.editor-container {
+  flex: 1;
+  overflow: hidden;
+}
+
+.preview-panel :deep(.el-card__body) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-frame {
+  flex: 1;
+  padding: 16px;
+  background: #f5f5f5;
+  overflow: auto;
+}
+
+.preview-frame iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  background: white;
+  border-radius: 4px;
+}
+
+:deep(.el-empty) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
 </style>

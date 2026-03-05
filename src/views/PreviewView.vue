@@ -1,15 +1,12 @@
 <template>
   <div class="preview-view">
-    <div class="panel editor-panel">
-      <div class="editor-tabs">
-        <button :class="['tab', { active: activeTab === 'html' }]"
-                @click="activeTab = 'html'">HTML</button>
-        <button :class="['tab', { active: activeTab === 'css' }]"
-                @click="activeTab = 'css'">CSS</button>
-        <button :class="['tab', { active: activeTab === 'js' }]"
-                @click="activeTab = 'js'">JavaScript</button>
-      </div>
-      
+    <el-card class="panel editor-panel" shadow="hover">
+      <el-tabs v-model="activeTab" class="editor-tabs">
+        <el-tab-pane label="HTML" name="html" />
+        <el-tab-pane label="CSS" name="css" />
+        <el-tab-pane label="JavaScript" name="js" />
+      </el-tabs>
+
       <div class="editor-container">
         <MonacoEditor
           v-if="activeTab === 'html'"
@@ -30,25 +27,35 @@
           @update:value="previewStore.setJavascript"
         />
       </div>
-    </div>
-    
-    <div class="panel preview-panel">
-      <div class="toolbar">
-        <div class="viewport-buttons">
-          <button :class="{ active: previewStore.viewport === 'mobile' }"
-                  @click="previewStore.setViewport('mobile')">📱</button>
-          <button :class="{ active: previewStore.viewport === 'tablet' }"
-                  @click="previewStore.setViewport('tablet')">📱</button>
-          <button :class="{ active: previewStore.viewport === 'desktop' }"
-                  @click="previewStore.setViewport('desktop')">🖥️</button>
+    </el-card>
+
+    <el-card class="panel preview-panel" shadow="hover">
+      <template #header>
+        <div class="toolbar">
+          <el-radio-group v-model="previewStore.viewport" size="small">
+            <el-radio-button value="mobile">
+              <el-icon><Iphone /></el-icon>
+            </el-radio-button>
+            <el-radio-button value="tablet">
+              <el-icon><Grid /></el-icon>
+            </el-radio-button>
+            <el-radio-button value="desktop">
+              <el-icon><Monitor /></el-icon>
+            </el-radio-button>
+          </el-radio-group>
+
+          <el-button-group size="small">
+            <el-button @click="previewStore.setZoom(previewStore.zoom - 0.1)">
+              <el-icon><ZoomOut /></el-icon>
+            </el-button>
+            <el-button disabled>{{ Math.round(previewStore.zoom * 100) }}%</el-button>
+            <el-button @click="previewStore.setZoom(previewStore.zoom + 0.1)">
+              <el-icon><ZoomIn /></el-icon>
+            </el-button>
+          </el-button-group>
         </div>
-        <div class="zoom-controls">
-          <button @click="previewStore.setZoom(previewStore.zoom - 0.1)">-</button>
-          <span>{{ Math.round(previewStore.zoom * 100) }}%</span>
-          <button @click="previewStore.setZoom(previewStore.zoom + 0.1)">+</button>
-        </div>
-      </div>
-      
+      </template>
+
       <div class="preview-container">
         <iframe
           :srcdoc="previewStore.combinedHtml"
@@ -59,12 +66,13 @@
           sandbox="allow-scripts"
         ></iframe>
       </div>
-    </div>
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
+import { Iphone, Grid, Monitor, ZoomOut, ZoomIn } from '@element-plus/icons-vue'
 import { usePreviewStore } from '@/stores/preview'
 import MonacoEditor from '@/components/MonacoEditor.vue'
 
@@ -82,35 +90,24 @@ const activeTab = ref<'html' | 'css' | 'js'>('html')
 }
 
 .panel {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-.editor-panel {
+.editor-panel :deep(.el-card__body) {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   padding: 1rem;
 }
 
 .editor-tabs {
-  display: flex;
-  gap: 0.25rem;
   margin-bottom: 0.5rem;
 }
 
-.tab {
-  background: #f5f5f5;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.tab.active {
-  background: #42b883;
-  color: white;
+.editor-tabs :deep(.el-tabs__header) {
+  margin: 0;
 }
 
 .editor-container {
@@ -118,51 +115,17 @@ const activeTab = ref<'html' | 'css' | 'js'>('html')
   overflow: hidden;
 }
 
-.preview-panel {
+.preview-panel :deep(.el-card__body) {
+  flex: 1;
   display: flex;
   flex-direction: column;
+  padding: 0;
 }
 
 .toolbar {
   display: flex;
   justify-content: space-between;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #eee;
-  background: #f9f9f9;
-}
-
-.viewport-buttons {
-  display: flex;
-  gap: 0.25rem;
-}
-
-.viewport-buttons button {
-  background: #f5f5f5;
-  border: none;
-  padding: 0.5rem 0.75rem;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.viewport-buttons button.active {
-  background: #42b883;
-  color: white;
-}
-
-.zoom-controls {
-  display: flex;
   align-items: center;
-  gap: 0.5rem;
-}
-
-.zoom-controls button {
-  background: #f5f5f5;
-  border: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: bold;
 }
 
 .preview-container {

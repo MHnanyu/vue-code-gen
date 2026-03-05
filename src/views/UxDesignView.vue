@@ -1,81 +1,87 @@
 <template>
   <div class="ux-design-view">
-    <div class="panel input-panel">
-      <h2>🎨 Design Requirements</h2>
-      <textarea
+    <el-card class="panel input-panel" shadow="hover">
+      <template #header>
+        <span>🎨 Design Requirements</span>
+      </template>
+
+      <el-input
         v-model="designPrompt"
+        type="textarea"
+        :rows="6"
         placeholder="Describe the UX design you want, e.g., Design a modern login page with social media login options..."
-        rows="6"
-      ></textarea>
-      
+        resize="none"
+      />
+
       <div class="options">
         <h3>Design Style</h3>
-        <div class="style-options">
-          <label v-for="style in designStyles" :key="style.value">
-            <input type="radio" v-model="selectedStyle" :value="style.value" />
+        <el-radio-group v-model="selectedStyle">
+          <el-radio-button v-for="style in designStyles" :key="style.value" :value="style.value">
             {{ style.label }}
-          </label>
-        </div>
+          </el-radio-button>
+        </el-radio-group>
       </div>
-      
-      <div class="actions">
-        <button class="btn-primary" @click="generateDesign" :disabled="isGenerating">
-          {{ isGenerating ? 'Generating...' : 'Generate Design' }}
-        </button>
-      </div>
-    </div>
-    
-    <div class="panel output-panel">
-      <div class="design-output" v-if="generatedDesign">
+
+      <el-button
+        type="success"
+        :loading="isGenerating"
+        :disabled="!designPrompt.trim()"
+        @click="generateDesign"
+      >
+        {{ isGenerating ? 'Generating...' : 'Generate Design' }}
+      </el-button>
+    </el-card>
+
+    <el-card class="panel output-panel" shadow="hover">
+      <template v-if="generatedDesign">
         <div class="design-preview">
           <div class="mockup-frame">
             <div class="mockup-content" v-html="generatedDesign.html"></div>
           </div>
         </div>
-        
+
+        <el-divider />
+
         <div class="design-specs">
           <h3>📐 Design Specifications</h3>
-          <div class="spec-section">
-            <h4>Color Palette</h4>
-            <div class="color-palette">
-              <div v-for="color in generatedDesign.colors" :key="color"
-                   class="color-swatch" :style="{ background: color }">
-                <span>{{ color }}</span>
+
+          <el-descriptions :column="1" border>
+            <el-descriptions-item label="Color Palette">
+              <div class="color-palette">
+                <el-tooltip
+                  v-for="color in generatedDesign.colors"
+                  :key="color"
+                  :content="color"
+                  placement="top"
+                >
+                  <div class="color-swatch" :style="{ background: color }" />
+                </el-tooltip>
               </div>
-            </div>
-          </div>
-          
-          <div class="spec-section">
-            <h4>Typography</h4>
-            <p>{{ generatedDesign.typography }}</p>
-          </div>
-          
-          <div class="spec-section">
-            <h4>Spacing System</h4>
-            <p>{{ generatedDesign.spacing }}</p>
-          </div>
+            </el-descriptions-item>
+            <el-descriptions-item label="Typography">
+              {{ generatedDesign.typography }}
+            </el-descriptions-item>
+            <el-descriptions-item label="Spacing System">
+              {{ generatedDesign.spacing }}
+            </el-descriptions-item>
+          </el-descriptions>
         </div>
-      </div>
-      
-      <div class="empty-state" v-else>
-        <p>Describe your design requirements on the left and click Generate Design</p>
-      </div>
-    </div>
+      </template>
+
+      <el-empty v-else description="Describe your design requirements on the left and click Generate Design" />
+    </el-card>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref } from 'vue'
 
-const designPrompt = ref('')
-const selectedStyle = ref('modern')
-const isGenerating = ref(false)
-const generatedDesign = ref<{
+interface GeneratedDesign {
   html: string
   colors: string[]
   typography: string
   spacing: string
-} | null>(null)
+}
 
 const designStyles = [
   { label: 'Modern Minimal', value: 'modern' },
@@ -85,11 +91,16 @@ const designStyles = [
   { label: 'Gradient', value: 'gradient' }
 ]
 
+const designPrompt = ref('')
+const selectedStyle = ref('modern')
+const isGenerating = ref(false)
+const generatedDesign = ref<GeneratedDesign | null>(null)
+
 async function generateDesign() {
   if (!designPrompt.value.trim()) return
-  
+
   isGenerating.value = true
-  
+
   // TODO: Call actual AI generation API
   setTimeout(() => {
     generatedDesign.value = {
@@ -121,31 +132,21 @@ async function generateDesign() {
 }
 
 .panel {
-  background: white;
-  border-radius: 8px;
-  padding: 1rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   display: flex;
   flex-direction: column;
   overflow: auto;
 }
 
-.input-panel textarea {
-  flex: 1;
-  resize: none;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 1rem;
-  font-size: 0.9rem;
-  margin-bottom: 1rem;
-  font-family: inherit;
+.input-panel :deep(.el-card__body) {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 .options {
-  margin-bottom: 1rem;
   padding: 1rem;
   background: #f9f9f9;
-  border-radius: 4px;
+  border-radius: 8px;
 }
 
 .options h3 {
@@ -154,39 +155,10 @@ async function generateDesign() {
   color: #333;
 }
 
-.style-options {
+.output-panel :deep(.el-card__body) {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 1rem;
-}
-
-.style-options label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-  font-size: 0.9rem;
-}
-
-.actions {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.btn-primary {
-  background: #42b883;
-  color: white;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 4px;
-  cursor: pointer;
-  font-weight: 500;
-  flex: 1;
-}
-
-.btn-primary:disabled {
-  background: #ccc;
-  cursor: not-allowed;
 }
 
 .design-output {
@@ -207,37 +179,10 @@ async function generateDesign() {
   min-height: 300px;
 }
 
-.design-specs {
-  background: #f9f9f9;
-  padding: 1.25rem;
-  border-radius: 8px;
-  border-left: 4px solid #42b883;
-}
-
 .design-specs h3 {
   margin: 0 0 1rem;
   color: #333;
   font-size: 1.1rem;
-}
-
-.spec-section {
-  margin-bottom: 1.25rem;
-}
-
-.spec-section:last-child {
-  margin-bottom: 0;
-}
-
-.spec-section h4 {
-  margin: 0 0 0.5rem;
-  color: #555;
-  font-size: 0.95rem;
-}
-
-.spec-section p {
-  margin: 0;
-  color: #666;
-  font-size: 0.9rem;
 }
 
 .color-palette {
@@ -247,32 +192,15 @@ async function generateDesign() {
 }
 
 .color-swatch {
-  width: 70px;
-  height: 45px;
+  width: 32px;
+  height: 32px;
   border-radius: 6px;
-  display: flex;
-  align-items: flex-end;
-  justify-content: center;
-  padding-bottom: 4px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s;
 }
 
-.color-swatch span {
-  font-size: 0.65rem;
-  background: rgba(255, 255, 255, 0.95);
-  padding: 2px 5px;
-  border-radius: 3px;
-  font-family: monospace;
-  color: #333;
-}
-
-.empty-state {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #999;
-  font-size: 1.1rem;
-  text-align: center;
+.color-swatch:hover {
+  transform: scale(1.1);
 }
 </style>
