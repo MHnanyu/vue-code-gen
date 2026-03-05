@@ -9,24 +9,29 @@ export interface PreviewState {
   zoom: number
 }
 
+export interface ConsoleMessage {
+  type: 'log' | 'error' | 'warn'
+  message: string
+  timestamp: Date
+}
+
+const VIEWPORT_WIDTHS: Record<PreviewState['viewport'], number> = {
+  mobile: 375,
+  tablet: 768,
+  desktop: 1280
+}
+
 export const usePreviewStore = defineStore('preview', () => {
   const html = ref('')
   const css = ref('')
   const javascript = ref('')
   const viewport = ref<PreviewState['viewport']>('desktop')
   const zoom = ref(1)
-  const consoleOutput = ref<Array<{ type: 'log' | 'error' | 'warn'; message: string; timestamp: Date }>>([])
+  const consoleOutput = ref<ConsoleMessage[]>([])
 
-  const viewportWidth = computed(() => {
-    switch (viewport.value) {
-      case 'mobile': return 375
-      case 'tablet': return 768
-      case 'desktop': return 1280
-    }
-  })
+  const viewportWidth = computed(() => VIEWPORT_WIDTHS[viewport.value])
 
-  const combinedHtml = computed(() => {
-    return `<!DOCTYPE html>
+  const combinedHtml = computed(() => `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
@@ -45,32 +50,17 @@ export const usePreviewStore = defineStore('preview', () => {
     } catch (e) {
       console.error(e.message);
     }
-  <` + `/script>
+  \x3C/script>
 </body>
-</html>`
-  })
+</html>`)
 
-  function setHtml(content: string) {
-    html.value = content
-  }
+  const setHtml = (content: string) => { html.value = content }
+  const setCss = (content: string) => { css.value = content }
+  const setJavascript = (content: string) => { javascript.value = content }
+  const setViewport = (value: PreviewState['viewport']) => { viewport.value = value }
+  const setZoom = (value: number) => { zoom.value = Math.max(0.25, Math.min(2, value)) }
 
-  function setCss(content: string) {
-    css.value = content
-  }
-
-  function setJavascript(content: string) {
-    javascript.value = content
-  }
-
-  function setViewport(newViewport: PreviewState['viewport']) {
-    viewport.value = newViewport
-  }
-
-  function setZoom(newZoom: number) {
-    zoom.value = Math.max(0.25, Math.min(2, newZoom))
-  }
-
-  function addConsoleOutput(type: 'log' | 'error' | 'warn', message: string) {
+  function addConsoleOutput(type: ConsoleMessage['type'], message: string) {
     consoleOutput.value.push({ type, message, timestamp: new Date() })
   }
 

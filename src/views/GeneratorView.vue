@@ -74,7 +74,7 @@ const currentLib = computed(() => (route.query.lib as string) || 'ElementUI')
 
 const previewHtml = computed(() => {
   if (!store.currentFile?.content) return ''
-  return \<!DOCTYPE html>
+  return `<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"></head>
 <body style="margin:0;padding:20px;font-family:sans-serif;background:#f5f5f5;">
@@ -83,7 +83,7 @@ const previewHtml = computed(() => {
     <small>完整预览需要运行时环境</small>
   </div>
 </body>
-</html>\
+</html>`
 })
 
 async function generateCode() {
@@ -105,7 +105,7 @@ async function generateCode() {
 
 function getExampleCode(lib: string) {
   if (lib === 'aui') {
-    return \<template>
+    return `<template>
   <div class="user-management">
     <a-card title="用户管理">
       <a-button type="primary" @click="handleAdd">新增</a-button>
@@ -120,9 +120,10 @@ const searchText = ref('')
 const users = ref([])
 const columns = [{ title: '姓名', dataIndex: 'name' }]
 function handleAdd() {}
-<\ + '/script>\n<style scoped>.user-management { padding: 24px; }</style>\'
+<\/script>
+<style scoped>.user-management { padding: 24px; }</style>`
   }
-  return \<template>
+  return `<template>
   <div class="user-management">
     <el-card>
       <template #header>
@@ -138,7 +139,8 @@ function handleAdd() {}
 import { ref } from 'vue'
 const searchText = ref('')
 const users = ref([])
-<\ + '/script>\n<style scoped>.user-management { padding: 24px; }</style>\'
+<\/script>
+<style scoped>.user-management { padding: 24px; }</style>`
 }
 
 function copyCode() {
