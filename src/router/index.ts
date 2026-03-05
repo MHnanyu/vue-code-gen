@@ -10,6 +10,12 @@ const router = createRouter({
       meta: { title: '首页' }
     },
     {
+      path: '/chat',
+      name: 'chat',
+      component: () => import('@/views/ChatView.vue'),
+      meta: { title: 'AI对话' }
+    },
+    {
       path: '/generator',
       name: 'generator',
       component: () => import('@/views/GeneratorView.vue'),

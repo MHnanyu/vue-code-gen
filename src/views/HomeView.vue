@@ -59,8 +59,8 @@ function handleGenerate() {
   store.clearFiles()
 
   router.push({
-    path: '/generator',
-    query: { lib: selectedLib.value }
+    path: '/chat',
+    query: { prompt: prompt.value, lib: selectedLib.value }
   })
 }
 </script>

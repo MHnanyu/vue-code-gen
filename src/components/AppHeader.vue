@@ -6,6 +6,7 @@
     </div>
     
     <nav class="nav-links">
+      <router-link to="/chat">Chat</router-link>
       <router-link to="/generator">Code Gen</router-link>
       <router-link to="/preview">Preview</router-link>
       <router-link to="/ux-design">UX Design</router-link>
