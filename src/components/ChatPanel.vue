@@ -56,7 +56,7 @@
 import { ref, computed, watch, nextTick } from 'vue'
 import { useChatStore } from '@/stores/chat'
 import { useProjectStore } from '@/stores/project'
-import { generateMockProject, generatePreviewHtml, generateMockAIResponse, delay } from '@/api/mock'
+import { generateMockComponent, generateMockAIResponse, delay } from '@/api/mock'
 
 const props = defineProps<{
   initialPrompt?: string
@@ -116,10 +116,9 @@ async function sendMessage() {
   // 模拟AI响应延迟
   await delay(1500)
 
-  // 生成项目文件
-  const files = generateMockProject(message)
-  projectStore.setFiles(files)
-  projectStore.setPreviewHtml(generatePreviewHtml())
+  // 生成组件代码
+  const componentCode = generateMockComponent(message)
+  projectStore.setComponentCode(componentCode)
 
   // 添加AI回复
   const aiResponse = generateMockAIResponse(message)

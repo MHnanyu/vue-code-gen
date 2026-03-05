@@ -32,6 +32,12 @@ const router = createRouter({
       name: 'ux-design',
       component: () => import('@/views/UxDesignView.vue'),
       meta: { title: 'UX设计' }
+    },
+    {
+      path: '/live-preview',
+      name: 'live-preview',
+      component: () => import('@/views/LivePreview.vue'),
+      meta: { title: '动态预览' }
     }
   ]
 })
