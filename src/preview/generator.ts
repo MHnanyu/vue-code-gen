@@ -1,28 +1,6 @@
+import * as VueCompilerSFC from '@vue/compiler-sfc'
 import type { ProjectFile } from '@/types'
-import { stripTypes } from './compiler'
 import { collectAllFiles } from './resolver'
-
-// 组件库配置
-interface LibraryConfig {
-  name: string
-  css: string[]
-  setup: string
-}
-
-// 支持的组件库
-const LIBRARY_CONFIGS: Record<string, LibraryConfig> = {
-  'element-plus': {
-    name: 'ElementPlus',
-    css: ['https://unpkg.com/element-plus@2.9.1/dist/index.css'],
-    setup: `
-      app.use(ElementPlus)
-      // 注册所有图标组件
-      for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
-        app.component(key, component)
-      }
-    `,
-  },
-}
 
 /**
  * 转义模板字符串中的特殊字符
@@ -35,112 +13,253 @@ function escapeTemplateString(str: string): string {
 }
 
 /**
- * 从 Vue SFC 内容中提取 template
+ * 编译结果
  */
-function extractTemplate(content: string): string {
-  const match = content.match(/<template>([\s\S]*?)<\/template>/)
-  return match ? match[1].trim() : ''
+interface CompiledSFC {
+  template: string
+  script: string
+  styles: string[]
+  errors: string[]
 }
 
 /**
- * 从 Vue SFC 内容中提取 script setup 内容
+ * 生成 Vue 全局变量声明
  */
-function extractScriptSetup(content: string): string {
-  const match = content.match(/<script\s+setup[^>]*>([\s\S]*?)<\/script>/)
-  return match ? match[1].trim() : ''
+function generateVueGlobals(): string {
+  return `
+    const Vue = window.Vue
+    const ref = Vue.ref
+    const reactive = Vue.reactive
+    const computed = Vue.computed
+    const watch = Vue.watch
+    const watchEffect = Vue.watchEffect
+    const onMounted = Vue.onMounted
+    const onUnmounted = Vue.onUnmounted
+    const onBeforeMount = Vue.onBeforeMount
+    const onBeforeUnmount = Vue.onBeforeUnmount
+    const onUpdated = Vue.onUpdated
+    const provide = Vue.provide
+    const inject = Vue.inject
+    const toRef = Vue.toRef
+    const toRefs = Vue.toRefs
+    const unref = Vue.unref
+    const isRef = Vue.isRef
+    const shallowRef = Vue.shallowRef
+    const shallowReactive = Vue.shallowReactive
+    const readonly = Vue.readonly
+    const nextTick = Vue.nextTick
+    const defineComponent = Vue.defineComponent
+    const defineProps = Vue.defineProps
+    const defineEmits = Vue.defineEmits
+    const defineExpose = Vue.defineExpose
+    const withDefaults = Vue.withDefaults
+    const useSlots = Vue.useSlots
+    const useAttrs = Vue.useAttrs
+    const createElementBlock = Vue.createElementBlock
+    const createElementVNode = Vue.createElementVNode
+    const createBaseVNode = Vue.createBaseVNode
+    const createCommentVNode = Vue.createCommentVNode
+    const createStaticVNode = Vue.createStaticVNode
+    const createTextVNode = Vue.createTextVNode
+    const Fragment = Vue.Fragment
+    const openBlock = Vue.openBlock
+    const setBlockTracking = Vue.setBlockTracking
+    const mergeProps = Vue.mergeProps
+    const normalizeClass = Vue.normalizeClass
+    const normalizeStyle = Vue.normalizeStyle
+    const renderList = Vue.renderList
+    const renderSlot = Vue.renderSlot
+    const resolveComponent = Vue.resolveComponent
+    const resolveDirective = Vue.resolveDirective
+    const resolveDynamicComponent = Vue.resolveDynamicComponent
+    const withCtx = Vue.withCtx
+    const withDirectives = Vue.withDirectives
+    const vModelText = Vue.vModelText
+    const vModelCheckbox = Vue.vModelCheckbox
+    const vModelRadio = Vue.vModelRadio
+    const vModelSelect = Vue.vModelSelect
+    const vModelDynamic = Vue.vModelDynamic
+    const vShow = Vue.vShow
+    const Transition = Vue.Transition
+    const TransitionGroup = Vue.TransitionGroup
+    const KeepAlive = Vue.KeepAlive
+    const Suspense = Vue.Suspense
+    const Teleport = Vue.Teleport
+  `
 }
 
 /**
- * 从 Vue SFC 内容中提取 script (非 setup) 内容
+ * 使用 @vue/compiler-sfc 编译 Vue SFC
  */
-function extractScript(content: string): string {
-  const match = content.match(/<script[^>]*>([\s\S]*?)<\/script>/)
-  if (!match) return ''
-  // 排除 script setup
-  if (match[0].includes('setup')) return ''
-  return match[1].trim()
-}
-
-/**
- * 从 Vue SFC 内容中提取 style 内容
- */
-function extractStyles(content: string): string[] {
-  const styles: string[] = []
-  const regex = /<style[^>]*>([\s\S]*?)<\/style>/g
-  let match
-  while ((match = regex.exec(content)) !== null) {
-    styles.push(match[1].trim())
+function compileSFC(content: string, filename: string): CompiledSFC {
+  const result: CompiledSFC = {
+    template: '',
+    script: '',
+    styles: [],
+    errors: [],
   }
-  return styles
+
+  try {
+    // 解析 SFC
+    const { descriptor, errors } = VueCompilerSFC.parse(content, { filename })
+
+    if (errors.length > 0) {
+      result.errors = errors.map(e => e.message)
+      return result
+    }
+
+    // 提取模板
+    if (descriptor.template) {
+      result.template = descriptor.template.content.trim()
+    }
+
+    // 编译 script
+    if (descriptor.scriptSetup || descriptor.script) {
+      try {
+        // 使用 inlineTemplate: true，让 compiler-sfc 内联模板渲染
+        const compiled = VueCompilerSFC.compileScript(descriptor, {
+          id: 'scope-id',
+          isProd: false,
+          inlineTemplate: true,
+        })
+
+        let script = compiled.content
+
+        // 移除 import 语句（运行时从全局 Vue 获取）
+        script = script.replace(/^import\s+.*?from\s+['"]vue['"]\s*;?\s*$/gm, '')
+        script = script.replace(/^import\s+.*?from\s+['"]@?element-plus.*?['"]\s*;?\s*$/gm, '')
+        // 移除其他 import 语句（组件导入等）
+        script = script.replace(/^import\s+.*?from\s+['"][^'"]+['"]\s*;?\s*$/gm, '')
+
+        // 移除所有 export 语句
+        script = script.replace(/^export\s+default\s+[\s\S]*?;?\s*$/gm, '') // export default ...
+        script = script.replace(/^export\s+(const|let|var|function|class)\s+/gm, '$1 ') // export const -> const
+
+        result.script = script
+      } catch (e) {
+        result.errors.push(`Script compile error: ${e instanceof Error ? e.message : String(e)}`)
+      }
+    }
+
+    // 提取样式
+    for (const style of descriptor.styles) {
+      result.styles.push(style.content)
+    }
+  } catch (e) {
+    result.errors.push(`Parse error: ${e instanceof Error ? e.message : String(e)}`)
+  }
+
+  return result
 }
 
 /**
- * 生成组件代码
+ * 生成组件注册代码
  */
 function generateComponentCode(file: ProjectFile): string {
   const content = file.content || ''
   const componentName = file.name.replace('.vue', '').replace(/[^a-zA-Z0-9]/g, '_')
 
-  const template = extractTemplate(content)
-  const scriptSetup = extractScriptSetup(content)
-  const script = extractScript(content)
-  const styles = extractStyles(content)
+  const compiled = compileSFC(content, file.path)
 
-  // 处理 script setup 代码
-  let processedScript = scriptSetup || script
-  processedScript = stripTypes(processedScript)
-  // 移除 import 语句（我们会在运行时提供）
-  processedScript = processedScript.replace(/import\s+[^;]+;?\n?/g, '')
+  if (compiled.errors.length > 0) {
+    const errorMsg = compiled.errors.join('; ')
+    return `
+      console.error('Component ${file.path} errors:', ${JSON.stringify(compiled.errors)})
+      app.component('${componentName}', {
+        template: '<div style="color:red;padding:20px;border:1px solid red;margin:10px;">${file.path} error: ${errorMsg}</div>'
+      })
+    `
+  }
 
-  // 生成样式代码
-  const styleCode = styles.map(style => `
+  const styleCode = compiled.styles.map((style) => `
     (function() {
       const style = document.createElement('style')
+      style.setAttribute('data-component', '${componentName}')
       style.textContent = \`${escapeTemplateString(style)}\`
       document.head.appendChild(style)
     })()
   `).join('\n')
 
-  // 生成组件定义
+  const script = compiled.script || 'const _sfc_main = {}'
+
   return `
     // Component: ${file.path}
-    const ${componentName}Component = (function() {
-      // 组件选项
-      const __options = {}
+    ;(function() {
+      ${generateVueGlobals()}
 
-      // 模板
-      const __template = \`${escapeTemplateString(template)}\`
+      ${script}
 
-      // Script setup 逻辑
-      ${processedScript}
-
-      // 收集 exports
-      const __exports = {}
-
-      // 定义响应式变量
-      const ref = Vue.ref
-      const reactive = Vue.reactive
-      const computed = Vue.computed
-      const watch = Vue.watch
-      const onMounted = Vue.onMounted
-      const onUnmounted = Vue.onUnmounted
-      const defineProps = () => ({})
-      const defineEmits = () => () => {}
-      const defineExpose = () => {}
-
-      // 返回组件定义
-      return {
-        template: __template,
-        name: '${componentName}',
-        ...__exports
-      }
+      const componentDef = typeof _sfc_main !== 'undefined' ? _sfc_main : {}
+      app.component('${componentName}', Object.assign({}, componentDef, {
+        template: \`${escapeTemplateString(compiled.template)}\`,
+        name: '${componentName}'
+      }))
     })()
 
-    // 注册样式
+    ${styleCode}
+  `
+}
+
+/**
+ * 生成 App 组件代码
+ */
+function generateAppComponent(file: ProjectFile): string {
+  const content = file.content || ''
+  const compiled = compileSFC(content, file.path)
+
+  if (compiled.errors.length > 0) {
+    const errorMsg = compiled.errors.join('; ')
+    return `
+      console.error('App.vue errors:', ${JSON.stringify(compiled.errors)})
+      app.component('App', {
+        template: '<div style="color:red;padding:20px;">App.vue error: ${errorMsg}</div>'
+      })
+    `
+  }
+
+  const styleCode = compiled.styles.map(style => `
+    (function() {
+      const style = document.createElement('style')
+      style.setAttribute('data-component', 'App')
+      style.textContent = \`${escapeTemplateString(style)}\`
+      document.head.appendChild(style)
+    })()
+  `).join('\n')
+
+  const script = compiled.script || 'const _sfc_main = {}'
+
+  return `
+    // App Component
     ${styleCode}
 
-    // 注册组件
-    app.component('${componentName}', ${componentName}Component)
+    ;(function() {
+      ${generateVueGlobals()}
+
+      ${script}
+
+      const componentDef = typeof _sfc_main !== 'undefined' ? _sfc_main : {}
+      app.component('App', Object.assign({}, componentDef, {
+        template: \`${escapeTemplateString(compiled.template)}\`,
+        name: 'App'
+      }))
+    })()
+  `
+}
+
+/**
+ * 生成默认 App 组件（当没有 App.vue 时）
+ */
+function generateDefaultApp(): string {
+  return `
+    app.component('App', {
+      template: \`
+        <div style="padding: 20px; text-align: center;">
+          <h1 style="color: #42b883;">Vue 3 Preview</h1>
+          <p>No App.vue found. Please create an App.vue file.</p>
+        </div>
+      \`,
+      name: 'App'
+    })
   `
 }
 
@@ -154,41 +273,18 @@ export function generatePreviewHtml(
     library?: string
   } = {}
 ): string {
-  const { title = 'Vue3 Preview', library = 'element-plus' } = options
-  const libConfig = LIBRARY_CONFIGS[library] || LIBRARY_CONFIGS['element-plus']
+  const { title = 'Vue3 Preview' } = options
 
   const allFiles = collectAllFiles(files)
   const vueFiles = allFiles.filter(f => f.name.endsWith('.vue'))
   const appVue = vueFiles.find(f => f.name === 'App.vue')
 
-  // 生成组件注册代码
   const componentCodes = vueFiles
     .filter(f => f.name !== 'App.vue')
     .map(f => generateComponentCode(f))
     .join('\n')
 
-  // 生成 App 组件代码
-  let appCode = ''
-  if (appVue) {
-    appCode = generateAppComponent(appVue)
-  } else {
-    // 默认 App
-    appCode = `
-      const App = {
-        template: \`
-          <div style="padding: 20px; text-align: center;">
-            <h1 style="color: #42b883;">Vue 3 Preview</h1>
-            <p>No App.vue found. Please create an App.vue file.</p>
-          </div>
-        \`
-      }
-    `
-  }
-
-  // CSS 链接
-  const cssLinks = libConfig.css
-    .map(url => `<link rel="stylesheet" href="${url}">`)
-    .join('\n')
+  const appCode = appVue ? generateAppComponent(appVue) : generateDefaultApp()
 
   return `<!DOCTYPE html>
 <html lang="en">
@@ -196,7 +292,7 @@ export function generatePreviewHtml(
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${title}</title>
-  ${cssLinks}
+  <link rel="stylesheet" href="https://unpkg.com/element-plus@2.9.1/dist/index.css">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
@@ -217,6 +313,9 @@ export function generatePreviewHtml(
       z-index: 9999;
       white-space: pre-wrap;
       display: none;
+      max-height: 50vh;
+      overflow: auto;
+      border-bottom: 1px solid #fbc4c4;
     }
     #error-container:not(:empty) { display: block; }
     .loading {
@@ -247,22 +346,19 @@ export function generatePreviewHtml(
     </div>
   </div>
 
-  <script type="module">
-    // 导入 Vue (使用 esm.sh 获得更好的 CORS 支持)
-    import * as Vue from 'https://esm.sh/vue@3.5.13'
-    import * as ElementPlus from 'https://esm.sh/element-plus@2.9.1'
-    import * as ElementPlusIconsVue from 'https://esm.sh/@element-plus/icons-vue@2.3.2'
+  <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
+  <script src="https://unpkg.com/element-plus@2.9.1/dist/index.full.min.js"></script>
+  <script src="https://unpkg.com/@element-plus/icons-vue@2.3.2/dist/index.iife.min.js"></script>
 
-    // 全局错误处理
+  <script>
     window.onerror = function(msg, url, line, col, error) {
       const container = document.getElementById('error-container')
-      container.textContent = 'Error: ' + msg + '\\n  at line ' + line + ': ' + url
+      container.textContent = 'Error: ' + msg + '\\n  at ' + url + ':' + line
       container.style.display = 'block'
       console.error('Preview Error:', msg, url, line, col, error)
       return true
     }
 
-    // 未捕获的 Promise 错误
     window.addEventListener('unhandledrejection', function(event) {
       const container = document.getElementById('error-container')
       container.textContent = 'Promise Error: ' + event.reason
@@ -271,24 +367,27 @@ export function generatePreviewHtml(
     })
 
     try {
-      // 创建应用
+      const Vue = window.Vue
+      const ElementPlus = window.ElementPlus
+      const ElementPlusIconsVue = window.ElementPlusIconsVue
+
       const app = Vue.createApp({})
+      app.config.compilerOptions.isCustomElement = () => false
+      app.use(ElementPlus)
 
-      // 使用组件库
-      ${libConfig.setup}
+      for (const [key, component] of Object.entries(ElementPlusIconsVue || {})) {
+        app.component(key, component)
+      }
 
-      // 注册子组件
       ${componentCodes}
 
-      // App 组件
       ${appCode}
 
-      // 挂载
       app.mount('#app')
 
     } catch (error) {
       const container = document.getElementById('error-container')
-      container.textContent = 'Compilation Error: ' + error.message
+      container.textContent = 'Compilation Error: ' + error.message + '\\n\\n' + (error.stack || '')
       container.style.display = 'block'
       console.error('Compilation Error:', error)
     }
@@ -298,71 +397,15 @@ export function generatePreviewHtml(
 }
 
 /**
- * 生成 App 组件代码
- */
-function generateAppComponent(file: ProjectFile): string {
-  const content = file.content || ''
-  const template = extractTemplate(content)
-  const scriptSetup = extractScriptSetup(content)
-  const script = extractScript(content)
-  const styles = extractStyles(content)
-
-  // 处理 script
-  let processedScript = scriptSetup || script
-  processedScript = stripTypes(processedScript)
-  processedScript = processedScript.replace(/import\s+[^;]+;?\n?/g, '')
-
-  // 生成样式
-  const styleCode = styles.map(style => `
-    (function() {
-      const style = document.createElement('style')
-      style.textContent = \`${escapeTemplateString(style)}\`
-      document.head.appendChild(style)
-    })()
-  `).join('\n')
-
-  return `
-    ${styleCode}
-
-    const App = (function() {
-      const ref = Vue.ref
-      const reactive = Vue.reactive
-      const computed = Vue.computed
-      const watch = Vue.watch
-      const onMounted = Vue.onMounted
-      const onUnmounted = Vue.onUnmounted
-      const defineProps = () => ({})
-      const defineEmits = () => () => {}
-      const defineExpose = () => {}
-
-      ${processedScript}
-
-      return {
-        template: \`${escapeTemplateString(template)}\`,
-        name: 'App'
-      }
-    })()
-
-    app.component('App', App)
-  `
-}
-
-/**
- * 检测项目使用的组件库
+ * 检测组件库
  */
 export function detectLibrary(files: ProjectFile[]): string {
   const allFiles = collectAllFiles(files)
-
   for (const file of allFiles) {
     const content = file.content || ''
-
     if (content.includes('element-plus') || content.includes('ElementPlus')) {
       return 'element-plus'
     }
-    // 可扩展其他组件库
-    // if (content.includes('ant-design-vue')) return 'ant-design-vue'
-    // if (content.includes('vant')) return 'vant'
   }
-
   return 'element-plus'
 }
