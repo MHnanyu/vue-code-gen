@@ -58,7 +58,7 @@ const SUPPORTED_EXTS = /\.(vue|ts|tsx|js|jsx)$/
 function normalizeImports(content: string, filename: string): string {
   let result = content
 
-  // 为 App.vue 自动添加 Element Plus 全局注册
+  // 为 App.vue 自动添加 Element Plus 和 Tailwind CSS
   if (filename === 'App.vue') {
     const scriptMatch = result.match(/(<script\s+setup[^>]*>)([\s\S]*?)(<\/script>)/)
     if (scriptMatch && !scriptMatch[2].includes('element-plus')) {
@@ -71,12 +71,20 @@ function normalizeImports(content: string, filename: string): string {
         : ''
       
       const cssInject = `onMounted(() => {
+  // Element Plus CSS
   if (!document.querySelector('link[data-element-plus-css]')) {
     const link = document.createElement('link')
     link.rel = 'stylesheet'
     link.href = 'https://unpkg.com/element-plus@2.4.4/dist/index.css'
     link.dataset.elementPlusCss = 'true'
     document.head.appendChild(link)
+  }
+  // Tailwind CSS
+  if (!document.querySelector('script[data-tailwind]')) {
+    const script = document.createElement('script')
+    script.src = 'https://cdn.tailwindcss.com'
+    script.dataset.tailwind = 'true'
+    document.head.appendChild(script)
   }
 })
 `

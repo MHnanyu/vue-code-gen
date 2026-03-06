@@ -3,6 +3,7 @@ import type { ProjectFile } from '@/types'
 export const MAIN_TS = `import { createApp } from 'vue'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
+import './style.css'
 import App from './App.vue'
 
 const app = createApp(App)
@@ -56,6 +57,8 @@ export const PACKAGE_JSON = JSON.stringify({
   },
   devDependencies: {
     '@vitejs/plugin-vue': '^5.0.0',
+    tailwindcss: '^4.0.0',
+    '@tailwindcss/vite': '^4.0.0',
     typescript: '^5.9.0',
     vite: '^7.0.0',
     'vue-tsc': '^2.0.0'
@@ -64,16 +67,20 @@ export const PACKAGE_JSON = JSON.stringify({
 
 export const VITE_CONFIG_TS = `import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import tailwindcss from '@tailwindcss/vite'
 import { resolve } from 'path'
 
 export default defineConfig({
-  plugins: [vue()],
+  plugins: [vue(), tailwindcss()],
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src')
     }
   }
 })
+`
+
+export const STYLE_CSS = `@import "tailwindcss";
 `
 
 export function getBaseProjectFiles(): ProjectFile[] {
@@ -93,6 +100,14 @@ export function getBaseProjectFiles(): ProjectFile[] {
       type: 'file',
       language: 'vue',
       content: APP_VUE
+    },
+    {
+      id: 'style-css',
+      name: 'style.css',
+      path: '/src/style.css',
+      type: 'file',
+      language: 'css',
+      content: STYLE_CSS
     },
     {
       id: 'index-html',
@@ -144,6 +159,7 @@ export function buildProjectFiles(
     children: [
       baseFiles[0],
       baseFiles[1],
+      baseFiles[2],
       mainPageFile,
       ...extraComponents
     ]
@@ -154,13 +170,13 @@ export function buildProjectFiles(
     name: 'public',
     path: '/public',
     type: 'folder',
-    children: [baseFiles[2]]
+    children: [baseFiles[3]]
   }
 
   return [
     srcFolder,
     publicFolder,
-    baseFiles[3],
-    baseFiles[4]
+    baseFiles[4],
+    baseFiles[5]
   ]
 }

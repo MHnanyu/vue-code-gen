@@ -18,10 +18,12 @@ export function generateMockProject(prompt: string): ProjectFile[] {
 function generateMainPageContent(prompt: string): string {
   const escapedPrompt = prompt.replace(/'/g, "\\'")
   return `<template>
-  <div class="main-page">
-    <h1>{{ title }}</h1>
-    <p>基于您的需求生成的内容：</p>
-    <blockquote>{{ userPrompt }}</blockquote>
+  <div class="max-w-3xl mx-auto p-10">
+    <h1 class="text-2xl font-bold text-gray-800 mb-4">{{ title }}</h1>
+    <p class="text-gray-600">基于您的需求生成的内容：</p>
+    <blockquote class="bg-gray-100 p-4 border-l-4 border-emerald-500 my-5 text-gray-500">
+      {{ userPrompt }}
+    </blockquote>
     <HelloWorld />
   </div>
 </template>
@@ -33,38 +35,18 @@ import HelloWorld from './HelloWorld.vue'
 const title = ref('Generated Page')
 const userPrompt = ref('${escapedPrompt}')
 </script>
-
-<style scoped>
-.main-page {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 40px 20px;
-}
-
-h1 {
-  color: #303133;
-  margin-bottom: 16px;
-}
-
-blockquote {
-  background: #f5f7fa;
-  padding: 16px;
-  border-left: 4px solid #42b883;
-  margin: 20px 0;
-  color: #606266;
-}
-</style>`
+`
 }
 
 function generateHelloWorldContent(): string {
   return `<template>
-  <div class="hello-world">
-    <h2>Hello World Component</h2>
-    <p>Count: {{ count }}</p>
+  <div class="p-5 bg-white rounded-lg shadow-md">
+    <h2 class="text-xl text-emerald-500 mb-4">Hello World Component</h2>
+    <p class="text-gray-700 mb-2">Count: {{ count }}</p>
     <el-button type="primary" @click="count++">Click Me</el-button>
     <el-divider />
-    <h3>Calendar</h3>
-    <el-calendar v-model="selectedDate" />
+    <h3 class="my-4 text-gray-600">Calendar</h3>
+    <el-calendar v-model="selectedDate" class="rounded-lg" />
   </div>
 </template>
 
@@ -74,33 +56,7 @@ import { ref } from 'vue'
 const count = ref(0)
 const selectedDate = ref(new Date())
 </script>
-
-<style scoped>
-.hello-world {
-  padding: 20px;
-  background: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-}
-
-h2 {
-  color: #42b883;
-  margin-bottom: 16px;
-}
-
-h3 {
-  margin: 16px 0;
-  color: #606266;
-}
-
-.el-button {
-  margin: 10px 0;
-}
-
-.el-calendar {
-  border-radius: 8px;
-}
-</style>`
+`
 }
 
 export function generateMockAIResponse(userMessage: string): string {
