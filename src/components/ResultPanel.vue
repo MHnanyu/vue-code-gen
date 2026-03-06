@@ -55,14 +55,33 @@ const replStore = useStore({
 // 方案：所有文件扁平化到 src/ 根，import 路径统一改成 "./文件名"
 const SUPPORTED_EXTS = /\.(vue|ts|tsx|js|jsx)$/
 
-function normalizeImports(content: string): string {
-  return content
+function normalizeImports(content: string, filename: string): string {
+  let result = content
     // 移除 CSS import
     .replace(/^import\s+['"][^'"]+\.css['"]\s*;?\s*$/gm, '')
     // @/path/to/File.vue → ./File.vue
     .replace(/(['"])@\/(?:[^'"]*\/)?([^/'"]+)\1/g, '$1./$2$1')
     // ./path/to/File.vue 或 ../path/to/File.vue → ./File.vue
     .replace(/(['"])\.\.?\/(?:[^'"]*\/)?([^/'"]+\.(vue|ts|tsx|js|jsx))\1/g, '$1./$2$1')
+
+  // 为 App.vue 自动添加 Element Plus 全局注册
+  if (filename === 'App.vue') {
+    const scriptMatch = result.match(/(<script\s+setup[^>]*>)([\s\S]*?)(<\/script>)/)
+    if (scriptMatch && !scriptMatch[2].includes('element-plus')) {
+      const needsGetCurrentInstance = !scriptMatch[2].includes('getCurrentInstance')
+      const vueImport = needsGetCurrentInstance ? `import { getCurrentInstance } from 'vue'\n` : ''
+      
+      const newScript = scriptMatch[1] + 
+        `\n${vueImport}import * as ElementPlus from 'element-plus'\n` +
+        `const app = getCurrentInstance()?.appContext.app\n` +
+        `if (app) app.use(ElementPlus)\n` +
+        scriptMatch[2] + 
+        scriptMatch[3]
+      result = result.replace(scriptMatch[0], newScript)
+    }
+  }
+
+  return result
 }
 
 function syncFilesToRepl() {
@@ -73,7 +92,7 @@ function syncFilesToRepl() {
   for (const f of allFiles) {
     if (!f.content || !SUPPORTED_EXTS.test(f.name)) continue
     // 扁平化：所有文件放到 src/ 根，key = "src/FileName.vue"
-    newFiles[f.name] = normalizeImports(f.content)
+    newFiles[f.name] = normalizeImports(f.content, f.name)
   }
   if (!newFiles['App.vue']) return
 
