@@ -25,11 +25,3 @@ export interface ProjectFile {
   language?: 'vue' | 'typescript' | 'javascript' | 'css' | 'html' | 'json'
   children?: ProjectFile[]
 }
-
-// 生成结果类型
-export interface GenerationResult {
-  sessionId: string
-  files: ProjectFile[]
-  previewHtml: string
-  createdAt: Date
-}
