@@ -56,7 +56,9 @@ watch(() => props.language, (newLang) => {
 })
 
 onUnmounted(() => {
+  const model = editor?.getModel()
   editor?.dispose()
+  model?.dispose()
 })
 </script>
 

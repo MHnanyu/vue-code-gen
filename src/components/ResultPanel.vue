@@ -45,8 +45,8 @@ const replStore = useStore({
   builtinImportMap: computed(() => ({
     imports: {
       ...vueImportMap.value.imports,
-      'element-plus': 'https://cdn.jsdelivr.net/npm/element-plus@2.9.1/dist/index.full.mjs',
-      '@element-plus/icons-vue': 'https://cdn.jsdelivr.net/npm/@element-plus/icons-vue@2.3.2/dist/index.esm.js',
+      'element-plus': 'https://unpkg.com/element-plus@2.4.4/dist/index.full.mjs',
+      '@element-plus/icons-vue': 'https://unpkg.com/@element-plus/icons-vue@2.3.1/dist/index.esm.js',
     },
   })),
 })
@@ -57,29 +57,52 @@ const SUPPORTED_EXTS = /\.(vue|ts|tsx|js|jsx)$/
 
 function normalizeImports(content: string, filename: string): string {
   let result = content
-    // 移除 CSS import
-    .replace(/^import\s+['"][^'"]+\.css['"]\s*;?\s*$/gm, '')
-    // @/path/to/File.vue → ./File.vue
-    .replace(/(['"])@\/(?:[^'"]*\/)?([^/'"]+)\1/g, '$1./$2$1')
-    // ./path/to/File.vue 或 ../path/to/File.vue → ./File.vue
-    .replace(/(['"])\.\.?\/(?:[^'"]*\/)?([^/'"]+\.(vue|ts|tsx|js|jsx))\1/g, '$1./$2$1')
 
   // 为 App.vue 自动添加 Element Plus 全局注册
   if (filename === 'App.vue') {
     const scriptMatch = result.match(/(<script\s+setup[^>]*>)([\s\S]*?)(<\/script>)/)
     if (scriptMatch && !scriptMatch[2].includes('element-plus')) {
-      const needsGetCurrentInstance = !scriptMatch[2].includes('getCurrentInstance')
-      const vueImport = needsGetCurrentInstance ? `import { getCurrentInstance } from 'vue'\n` : ''
+      const needsVueImports = []
+      if (!scriptMatch[2].includes('getCurrentInstance')) needsVueImports.push('getCurrentInstance')
+      if (!scriptMatch[2].includes('onMounted')) needsVueImports.push('onMounted')
+      
+      const vueImport = needsVueImports.length > 0 
+        ? `import { ${needsVueImports.join(', ')} } from 'vue'\n` 
+        : ''
+      
+      const cssInject = `onMounted(() => {
+  if (!document.querySelector('link[data-element-plus-css]')) {
+    const link = document.createElement('link')
+    link.rel = 'stylesheet'
+    link.href = 'https://unpkg.com/element-plus@2.4.4/dist/index.css'
+    link.dataset.elementPlusCss = 'true'
+    document.head.appendChild(link)
+  }
+})
+`
       
       const newScript = scriptMatch[1] + 
-        `\n${vueImport}import * as ElementPlus from 'element-plus'\n` +
-        `const app = getCurrentInstance()?.appContext.app\n` +
-        `if (app) app.use(ElementPlus)\n` +
+        `\n${vueImport}import ElementPlus from 'element-plus'\n` +
+        cssInject +
+        `const instance = getCurrentInstance()\n` +
+        `const app = instance?.appContext.app\n` +
+        `if (app && !app._elementPlusRegistered) {\n` +
+        `  app.use(ElementPlus)\n` +
+        `  app._elementPlusRegistered = true\n` +
+        `}\n` +
         scriptMatch[2] + 
         scriptMatch[3]
       result = result.replace(scriptMatch[0], newScript)
     }
   }
+
+  // 移除所有 CSS import（@vue/repl 不支持）
+  result = result
+    .replace(/^import\s+['"][^'"]+\.css['"]\s*;?\s*$/gm, '')
+    // @/path/to/File.vue → ./File.vue
+    .replace(/(['"])@\/(?:[^'"]*\/)?([^/'"]+)\1/g, '$1./$2$1')
+    // ./path/to/File.vue 或 ../path/to/File.vue → ./File.vue
+    .replace(/(['"])\.\.?\/(?:[^'"]*\/)?([^/'"]+\.(vue|ts|tsx|js|jsx))\1/g, '$1./$2$1')
 
   return result
 }
