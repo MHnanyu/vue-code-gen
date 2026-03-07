@@ -124,6 +124,14 @@ export const useChatStore = defineStore('chat', () => {
     pendingPrompt.value = prompt
   }
 
+  function updateSessionFiles(sessionId: string, files: ChatSession['files']) {
+    const session = sessions.value.find(s => s.id === sessionId)
+    if (session) {
+      session.files = files
+      session.updatedAt = new Date()
+    }
+  }
+
   return {
     sessions,
     currentSessionId,
@@ -140,6 +148,7 @@ export const useChatStore = defineStore('chat', () => {
     loadSessions,
     loadSession,
     setLoading,
-    setPendingPrompt
+    setPendingPrompt,
+    updateSessionFiles
   }
 })

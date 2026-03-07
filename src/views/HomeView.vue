@@ -28,7 +28,7 @@
             </el-select>
           </div>
 
-          <el-button type="success" :disabled="!prompt.trim()" @click="handleGenerate">
+          <el-button type="success" :loading="loading" :disabled="!prompt.trim()" @click="handleGenerate">
             生成 ➤
           </el-button>
         </div>
@@ -55,15 +55,24 @@ const chatStore = useChatStore()
 const libs = ['ElementUI', 'AUI']
 const prompt = ref('')
 const selectedLib = ref('ElementUI')
+const loading = ref(false)
 
-function handleGenerate() {
-  if (!prompt.value.trim()) return
+async function handleGenerate() {
+  if (!prompt.value.trim() || loading.value) return
 
-  store.setPrompt(prompt.value)
-  store.clearFiles()
-  chatStore.setPendingPrompt(prompt.value)
+  loading.value = true
+  try {
+    store.setPrompt(prompt.value)
+    store.clearFiles()
+    chatStore.setPendingPrompt(prompt.value)
 
-  router.push('/chat')
+    const sessionId = await chatStore.createSessionRemote(prompt.value.slice(0, 30))
+    if (sessionId) {
+      router.push({ path: '/chat', query: { session_id: sessionId } })
+    }
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 

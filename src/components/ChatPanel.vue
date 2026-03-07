@@ -145,6 +145,7 @@ async function sendMessage() {
       prompt: message,
       componentLib: 'ElementUI',
       sessionId,
+      files: currentSession.value?.files,
     })
 
     const mainPageContent = result.files[0]?.content || ''
@@ -158,9 +159,10 @@ async function sendMessage() {
     }))
     const projectFiles = buildProjectFiles(mainPageContent, extraFiles)
     projectStore.setFiles(projectFiles)
+    chatStore.updateSessionFiles(sessionId, result.files)
+    chatStore.addMessageLocal(sessionId, { role: 'assistant', content: result.message })
 
     ElMessage.success('生成成功')
-    await chatStore.loadSession(sessionId)
   } catch (error) {
     ElMessage.error('生成失败: ' + (error as Error).message)
   } finally {

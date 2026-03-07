@@ -12,6 +12,7 @@ interface GenerateRequest {
   prompt: string
   componentLib?: string
   sessionId?: string
+  files?: ApiFile[]
 }
 
 interface GenerateResponse {
