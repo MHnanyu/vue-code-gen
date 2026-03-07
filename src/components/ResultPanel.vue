@@ -22,6 +22,13 @@
           >
             保存并同步
           </el-button>
+          <el-button
+            type="primary"
+            :disabled="!isReplReady || activeTab !== 'preview'"
+            @click="exportStaticHtml"
+          >
+            导出 HTML
+          </el-button>
         </div>
       </div>
       
@@ -257,6 +264,41 @@ function handleRenameFile(file: ProjectFile, newName: string) {
 function handleContentChange(content: string) {
   if (selectedFile.value && !selectedFile.value.readonly) {
     projectStore.updateFileContent(selectedFile.value.id, content)
+  }
+}
+
+function exportStaticHtml() {
+  const replWrapper = document.querySelector('.repl-wrapper.preview')
+  if (!replWrapper) {
+    ElMessage.warning('预览区域未找到')
+    return
+  }
+  
+  const iframe = replWrapper.querySelector('iframe') as HTMLIFrameElement
+  if (!iframe) {
+    ElMessage.warning('预览 iframe 未找到')
+    return
+  }
+
+  try {
+    const innerDoc = iframe.contentDocument || iframe.contentWindow?.document
+    if (!innerDoc) {
+      ElMessage.warning('无法访问预览内容')
+      return
+    }
+
+    const htmlContent = innerDoc.documentElement.outerHTML
+    const blob = new Blob([htmlContent], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'exported-page.html'
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('导出成功')
+  } catch (error) {
+    console.error('Export failed:', error)
+    ElMessage.error('导出失败，可能是跨域限制')
   }
 }
 
