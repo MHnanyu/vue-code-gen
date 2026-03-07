@@ -98,7 +98,7 @@ import { useProjectStore } from '@/stores/project'
 import { useChatStore } from '@/stores/chat'
 import { updateSessionFiles, type ApiFile } from '@/api'
 import { collectAllFiles } from '@/preview/resolver'
-import { getBaseProjectFiles, TS_CONFIG, VITE_ENV_D_TS } from '@/templates/project-template'
+import { getBaseProjectFiles } from '@/templates/project-template'
 import FileTree from '@/components/FileTree.vue'
 import MonacoEditor from '@/components/MonacoEditor.vue'
 import type { ProjectFile } from '@/types'
@@ -313,13 +313,14 @@ function exportStaticHtml() {
 
 async function exportProject() {
   const zip = new JSZip()
+  const baseFiles = getBaseProjectFiles()
 
-  zip.file('package.json', getBaseProjectFiles().find(f => f.name === 'package.json')!.content)
-  zip.file('vite.config.ts', getBaseProjectFiles().find(f => f.name === 'vite.config.ts')!.content)
-  zip.file('tsconfig.json', TS_CONFIG)
+  const findFile = (name: string) => baseFiles.find(f => f.name === name)!
 
-  const indexHtml = getBaseProjectFiles().find(f => f.name === 'index.html')!.content
-  zip.file('index.html', indexHtml)
+  zip.file('package.json', findFile('package.json').content)
+  zip.file('vite.config.ts', findFile('vite.config.ts').content)
+  zip.file('tsconfig.json', findFile('tsconfig.json').content)
+  zip.file('index.html', findFile('index.html').content)
 
   const srcFolder = zip.folder('src')
   if (!srcFolder) {
@@ -327,17 +328,18 @@ async function exportProject() {
     return
   }
 
-  srcFolder.file('main.ts', getBaseProjectFiles().find(f => f.name === 'main.ts')!.content)
-  srcFolder.file('App.vue', getBaseProjectFiles().find(f => f.name === 'App.vue')!.content)
-  srcFolder.file('style.css', getBaseProjectFiles().find(f => f.name === 'style.css')!.content)
-  srcFolder.file('vite-env.d.ts', VITE_ENV_D_TS)
+  srcFolder.file('main.ts', findFile('main.ts').content)
+  srcFolder.file('App.vue', findFile('App.vue').content)
+  srcFolder.file('style.css', findFile('style.css').content)
+  srcFolder.file('vite-env.d.ts', findFile('vite-env.d.ts').content)
 
   const allFiles = collectAllFiles(projectStore.files)
+  const baseFileNames = baseFiles.map(f => f.name)
   const userFiles = allFiles.filter(f => 
     f.type === 'file' && 
     !f.readonly && 
     f.content &&
-    !['main.ts', 'App.vue', 'style.css', 'index.html', 'package.json', 'vite.config.ts'].includes(f.name)
+    !baseFileNames.includes(f.name)
   )
 
   for (const file of userFiles) {

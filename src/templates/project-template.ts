@@ -149,9 +149,18 @@ export function getBaseProjectFiles(): ProjectFile[] {
       readonly: true
     },
     {
+      id: 'vite-env-d-ts',
+      name: 'vite-env.d.ts',
+      path: '/src/vite-env.d.ts',
+      type: 'file',
+      language: 'typescript',
+      content: VITE_ENV_D_TS,
+      readonly: true
+    },
+    {
       id: 'index-html',
       name: 'index.html',
-      path: '/public/index.html',
+      path: '/index.html',
       type: 'file',
       language: 'html',
       content: INDEX_HTML,
@@ -173,6 +182,15 @@ export function getBaseProjectFiles(): ProjectFile[] {
       type: 'file',
       language: 'typescript',
       content: VITE_CONFIG_TS,
+      readonly: true
+    },
+    {
+      id: 'tsconfig-json',
+      name: 'tsconfig.json',
+      path: '/tsconfig.json',
+      type: 'file',
+      language: 'json',
+      content: TS_CONFIG,
       readonly: true
     }
   ]
@@ -202,23 +220,17 @@ export function buildProjectFiles(
       baseFiles[0],
       baseFiles[1],
       baseFiles[2],
+      baseFiles[3],
       mainPageFile,
       ...extraComponents
     ]
   }
 
-  const publicFolder: ProjectFile = {
-    id: 'public-folder',
-    name: 'public',
-    path: '/public',
-    type: 'folder',
-    children: [baseFiles[3]]
-  }
-
   return [
     srcFolder,
-    publicFolder,
     baseFiles[4],
-    baseFiles[5]
+    baseFiles[5],
+    baseFiles[6],
+    baseFiles[7]
   ]
 }
