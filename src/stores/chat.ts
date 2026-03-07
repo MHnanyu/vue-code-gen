@@ -1,6 +1,13 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { ChatMessage, ChatSession } from '@/types'
+import {
+  createSession as apiCreateSession,
+  getSessions as apiGetSessions,
+  getSession as apiGetSession,
+  deleteSession as apiDeleteSession,
+  transformApiSession,
+} from '@/api'
 
 export const useChatStore = defineStore('chat', () => {
   const sessions = ref<ChatSession[]>([])
@@ -15,6 +22,58 @@ export const useChatStore = defineStore('chat', () => {
   const sortedSessions = computed(() =>
     [...sessions.value].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
   )
+
+  async function createSessionRemote(title: string): Promise<string | null> {
+    try {
+      const apiSession = await apiCreateSession(title)
+      const session = transformApiSession(apiSession)
+      sessions.value.unshift(session)
+      currentSessionId.value = session.id
+      return session.id
+    } catch (error) {
+      console.error('Failed to create session:', error)
+      return null
+    }
+  }
+
+  async function loadSessions() {
+    try {
+      const result = await apiGetSessions()
+      sessions.value = result.list.map(transformApiSession)
+    } catch (error) {
+      console.error('Failed to load sessions:', error)
+    }
+  }
+
+  async function loadSession(sessionId: string) {
+    try {
+      const apiSession = await apiGetSession(sessionId)
+      const session = transformApiSession(apiSession)
+      const index = sessions.value.findIndex(s => s.id === sessionId)
+      if (index > -1) {
+        sessions.value[index] = session
+      } else {
+        sessions.value.push(session)
+      }
+    } catch (error) {
+      console.error('Failed to load session:', error)
+    }
+  }
+
+  async function deleteSessionRemote(id: string) {
+    try {
+      await apiDeleteSession(id)
+      const index = sessions.value.findIndex(s => s.id === id)
+      if (index > -1) {
+        sessions.value.splice(index, 1)
+        if (currentSessionId.value === id) {
+          currentSessionId.value = sessions.value[0]?.id || null
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete session:', error)
+    }
+  }
 
   function createSession(title: string): ChatSession {
     const session: ChatSession = {
@@ -33,7 +92,7 @@ export const useChatStore = defineStore('chat', () => {
     currentSessionId.value = id
   }
 
-  function addMessage(sessionId: string, message: Omit<ChatMessage, 'id' | 'timestamp'>) {
+  function addMessageLocal(sessionId: string, message: Omit<ChatMessage, 'id' | 'timestamp'>) {
     const session = sessions.value.find(s => s.id === sessionId)
     if (!session) return
 
@@ -73,9 +132,13 @@ export const useChatStore = defineStore('chat', () => {
     currentSession,
     sortedSessions,
     createSession,
+    createSessionRemote,
     selectSession,
-    addMessage,
+    addMessageLocal,
     deleteSession,
+    deleteSessionRemote,
+    loadSessions,
+    loadSession,
     setLoading,
     setPendingPrompt
   }

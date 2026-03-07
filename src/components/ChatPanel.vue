@@ -74,9 +74,12 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
 import { DArrowRight } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { useChatStore } from '@/stores/chat'
 import { useProjectStore } from '@/stores/project'
-import { generateMockProject, generateMockAIResponse, delay } from '@/api/mock'
+import { generateCode, transformApiFiles } from '@/api'
+import { buildProjectFiles } from '@/templates/project-template'
+import type { ProjectFile } from '@/types'
 
 const props = defineProps<{
   historyCollapsed?: boolean
@@ -128,35 +131,44 @@ async function sendMessage() {
 
   inputMessage.value = ''
 
-  // 如果没有当前会话，创建一个新的
   let sessionId = chatStore.currentSessionId
   if (!sessionId) {
-    const session = chatStore.createSession(message)
-    sessionId = session.id
+    sessionId = await chatStore.createSessionRemote(message)
+    if (!sessionId) return
   }
 
-  // 添加用户消息
-  chatStore.addMessage(sessionId, { role: 'user', content: message })
+  chatStore.addMessageLocal(sessionId, { role: 'user', content: message })
   scrollToBottom()
 
-  // 设置加载状态
   chatStore.setLoading(true)
 
-  // 模拟AI响应延迟
-  await delay(1500)
+  try {
+    const result = await generateCode({
+      prompt: message,
+      componentLib: 'ElementUI',
+      sessionId,
+    })
 
-  // 生成项目文件
-  const files = generateMockProject(message)
-  projectStore.setFiles(files)
+    const mainPageContent = result.files[0]?.content || ''
+    const extraFiles: ProjectFile[] = result.files.slice(1).map((f) => ({
+      id: f.id,
+      name: f.name,
+      path: f.path,
+      type: f.type as 'file',
+      language: f.language as ProjectFile['language'],
+      content: f.content,
+    }))
+    const projectFiles = buildProjectFiles(mainPageContent, extraFiles)
+    projectStore.setFiles(projectFiles)
 
-  // 添加AI回复
-  const aiResponse = generateMockAIResponse(message)
-  chatStore.addMessage(sessionId, { role: 'assistant', content: aiResponse })
-
-  chatStore.setLoading(false)
-  scrollToBottom()
-
-  emit('generated')
+    chatStore.addMessageLocal(sessionId, { role: 'assistant', content: result.message })
+  } catch (error) {
+    ElMessage.error('生成失败: ' + (error as Error).message)
+  } finally {
+    chatStore.setLoading(false)
+    scrollToBottom()
+    emit('generated')
+  }
 }
 
 function formatTime(date: Date): string {

@@ -64,16 +64,13 @@ const isResizing = ref(false)
 let startX = 0
 let startWidth = 0
 
-onMounted(() => {
+onMounted(async () => {
+  await chatStore.loadSessions()
+
   const sessionId = route.query.session_id as string
   if (sessionId) {
-    const session = chatStore.sessions.find(s => s.id === sessionId)
-    if (session) {
-      chatStore.selectSession(sessionId)
-    } else {
-      router.replace('/')
-      return
-    }
+    await chatStore.loadSession(sessionId)
+    chatStore.selectSession(sessionId)
   }
 })
 

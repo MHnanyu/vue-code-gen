@@ -59,12 +59,13 @@ const chatStore = useChatStore()
 const sortedSessions = computed(() => chatStore.sortedSessions)
 const currentSessionId = computed(() => chatStore.currentSessionId)
 
-function selectSession(id: string) {
+async function selectSession(id: string) {
+  await chatStore.loadSession(id)
   chatStore.selectSession(id)
 }
 
 function handleDelete(id: string) {
-  chatStore.deleteSession(id)
+  chatStore.deleteSessionRemote(id)
 }
 
 function handleNewChat() {
