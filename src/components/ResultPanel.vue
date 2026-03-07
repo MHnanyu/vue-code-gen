@@ -20,13 +20,18 @@
             :disabled="!projectStore.isModified"
             @click="handleSave"
           >
-            保存回传
+            保存并同步
           </el-button>
         </div>
       </div>
       
       <div v-if="activeTab === 'preview'" class="repl-wrapper preview flex-1">
+        <div v-if="!isReplReady" class="preview-loading">
+          <el-icon class="is-loading"><Loading /></el-icon>
+          <span>加载预览中...</span>
+        </div>
         <Repl
+          v-show="isReplReady"
           :store="replStore"
           :editor="Monaco"
           :preview-options="previewOptions"
@@ -71,6 +76,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Loading } from '@element-plus/icons-vue'
 import { useDebounceFn } from '@vueuse/core'
 import { Repl, useStore, useVueImportMap } from '@vue/repl'
 import Monaco from '@vue/repl/monaco-editor'
@@ -86,6 +92,7 @@ const projectStore = useProjectStore()
 const chatStore = useChatStore()
 const activeTab = ref('preview')
 const isSaving = ref(false)
+const isReplReady = ref(false)
 const hasFiles = computed(() => projectStore.files.length > 0)
 const selectedFile = computed(() => projectStore.selectedFile)
 
@@ -155,16 +162,23 @@ function normalizeImports(content: string, filename: string): string {
 
 function syncFilesToRepl() {
   const allFiles = collectAllFiles(projectStore.files)
-  if (allFiles.length === 0) return
+  if (allFiles.length === 0) {
+    isReplReady.value = false
+    return
+  }
 
   const newFiles: Record<string, string> = {}
   for (const f of allFiles) {
     if (!f.content || !SUPPORTED_EXTS.test(f.name)) continue
     newFiles[f.name] = normalizeImports(f.content, f.name)
   }
-  if (!newFiles['App.vue']) return
+  if (!newFiles['App.vue']) {
+    isReplReady.value = false
+    return
+  }
 
   replStore.setFiles(newFiles, 'App.vue')
+  isReplReady.value = true
 }
 
 function collectEditableApiFiles(): ApiFile[] {
@@ -283,6 +297,25 @@ watch(() => projectStore.files, debouncedSync, { deep: true, immediate: true })
 
 .repl-wrapper {
   overflow: hidden;
+  position: relative;
+}
+
+.preview-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #fff;
+  z-index: 10;
+  color: #909399;
+  font-size: 14px;
+}
+
+.preview-loading .el-icon {
+  font-size: 24px;
 }
 
 .repl-wrapper.preview :deep(.split-pane > .left),
