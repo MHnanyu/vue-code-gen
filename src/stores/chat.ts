@@ -6,6 +6,7 @@ export const useChatStore = defineStore('chat', () => {
   const sessions = ref<ChatSession[]>([])
   const currentSessionId = ref<string | null>(null)
   const isLoading = ref(false)
+  const pendingPrompt = ref<string | null>(null)
 
   const currentSession = computed(() =>
     sessions.value.find(s => s.id === currentSessionId.value) || null
@@ -60,16 +61,22 @@ export const useChatStore = defineStore('chat', () => {
     isLoading.value = value
   }
 
+  function setPendingPrompt(prompt: string | null) {
+    pendingPrompt.value = prompt
+  }
+
   return {
     sessions,
     currentSessionId,
     isLoading,
+    pendingPrompt,
     currentSession,
     sortedSessions,
     createSession,
     selectSession,
     addMessage,
     deleteSession,
-    setLoading
+    setLoading,
+    setPendingPrompt
   }
 })

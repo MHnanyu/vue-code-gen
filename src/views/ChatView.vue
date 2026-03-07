@@ -16,7 +16,6 @@
         :style="{ width: chatPanelWidth + 'px' }"
       >
         <ChatPanel
-          :initial-prompt="initialPrompt"
           ref="chatPanelRef"
           :history-collapsed="isHistoryCollapsed"
           @toggle-history="toggleHistory"
@@ -44,7 +43,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import { useProjectStore } from '@/stores/project'
@@ -59,7 +58,6 @@ const projectStore = useProjectStore()
 
 const chatPanelRef = ref<InstanceType<typeof ChatPanel> | null>(null)
 
-const initialPrompt = ref('')
 const isHistoryCollapsed = ref(false)
 const chatPanelWidth = ref(450)
 const isResizing = ref(false)
@@ -67,9 +65,21 @@ let startX = 0
 let startWidth = 0
 
 onMounted(() => {
-  const prompt = route.query.prompt as string
-  if (prompt) {
-    initialPrompt.value = prompt
+  const sessionId = route.query.session_id as string
+  if (sessionId) {
+    const session = chatStore.sessions.find(s => s.id === sessionId)
+    if (session) {
+      chatStore.selectSession(sessionId)
+    } else {
+      router.replace('/')
+      return
+    }
+  }
+})
+
+watch(() => chatStore.currentSessionId, (id) => {
+  if (id && route.query.session_id !== id) {
+    router.replace({ path: '/chat', query: { session_id: id } })
   }
 })
 

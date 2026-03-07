@@ -165,6 +165,11 @@ watch(() => projectStore.files, debouncedSync, { deep: true, immediate: true })
   height: 100% !important;
 }
 
+.repl-wrapper.preview :deep(.output-tabs),
+.repl-wrapper.preview :deep(.tab-buttons) {
+  display: none !important;
+}
+
 .repl-wrapper.code :deep(.split-pane > .right),
 .repl-wrapper.code :deep(.split-pane > .dragger) {
   display: none !important;

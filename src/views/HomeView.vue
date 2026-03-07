@@ -46,9 +46,11 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGeneratorStore } from '@/stores/generator'
+import { useChatStore } from '@/stores/chat'
 
 const router = useRouter()
 const store = useGeneratorStore()
+const chatStore = useChatStore()
 
 const libs = ['ElementUI', 'AUI']
 const prompt = ref('')
@@ -59,11 +61,9 @@ function handleGenerate() {
 
   store.setPrompt(prompt.value)
   store.clearFiles()
+  chatStore.setPendingPrompt(prompt.value)
 
-  router.push({
-    path: '/chat',
-    query: { prompt: prompt.value, lib: selectedLib.value }
-  })
+  router.push('/chat')
 }
 </script>
 

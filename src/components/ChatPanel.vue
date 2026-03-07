@@ -79,7 +79,6 @@ import { useProjectStore } from '@/stores/project'
 import { generateMockProject, generateMockAIResponse, delay } from '@/api/mock'
 
 const props = defineProps<{
-  initialPrompt?: string
   historyCollapsed?: boolean
 }>()
 
@@ -106,6 +105,14 @@ const placeholder = computed(() =>
 watch(currentSession, () => {
   scrollToBottom()
 })
+
+watch(() => chatStore.pendingPrompt, (prompt) => {
+  if (prompt && prompt.trim()) {
+    chatStore.setPendingPrompt(null)
+    inputMessage.value = prompt
+    sendMessage()
+  }
+}, { immediate: true })
 
 function scrollToBottom() {
   nextTick(() => {
@@ -155,14 +162,6 @@ async function sendMessage() {
 function formatTime(date: Date): string {
   return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
 }
-
-// 处理初始提示
-watch(() => props.initialPrompt, (prompt) => {
-  if (prompt && prompt.trim()) {
-    inputMessage.value = prompt
-    sendMessage()
-  }
-}, { immediate: true })
 </script>
 
 <style scoped>
