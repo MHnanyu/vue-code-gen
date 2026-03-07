@@ -1,21 +1,50 @@
 <template>
-  <div class="grid grid-cols-[260px_1fr_1fr] h-[calc(100vh-60px)] bg-gray-100">
-    <div class="bg-white overflow-hidden">
-      <HistoryPanel @new-chat="handleNewChat" />
+  <div
+    class="flex h-[calc(100vh-60px)] bg-gray-100 p-3 gap-3"
+    :class="isResizing ? 'select-none' : ''"
+  >
+    <div
+      class="bg-white rounded-lg overflow-hidden shadow-sm transition-all duration-300 flex-shrink-0"
+      :style="{ width: isHistoryCollapsed ? '0px' : '260px', padding: isHistoryCollapsed ? '0' : '', opacity: isHistoryCollapsed ? '0' : '1' }"
+    >
+      <HistoryPanel @new-chat="handleNewChat" @toggle="toggleHistory" :collapsed="isHistoryCollapsed" />
     </div>
 
-    <div class="border-l border-r border-gray-200 overflow-hidden">
-      <ChatPanel :initial-prompt="initialPrompt" ref="chatPanelRef" />
-    </div>
+    <div class="flex-1 bg-white rounded-lg shadow-sm flex min-w-0">
+      <div
+        class="overflow-hidden flex-shrink-0"
+        :style="{ width: chatPanelWidth + 'px' }"
+      >
+        <ChatPanel
+          :initial-prompt="initialPrompt"
+          ref="chatPanelRef"
+          :history-collapsed="isHistoryCollapsed"
+          @toggle-history="toggleHistory"
+        />
+      </div>
 
-    <div class="overflow-hidden">
-      <ResultPanel />
+      <div
+        class="w-px cursor-col-resize transition-colors relative self-stretch my-4 group"
+        :class="isResizing ? 'bg-blue-400' : 'bg-gray-200 hover:bg-blue-300'"
+        @mousedown="startResize"
+      >
+        <div class="absolute inset-y-0 -left-3 -right-3 cursor-col-resize" />
+      </div>
+
+      <div class="flex-1 overflow-hidden min-w-[200px] relative">
+        <ResultPanel />
+        <div
+          v-if="isResizing"
+          class="absolute inset-0 z-50"
+          style="cursor: col-resize"
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import { useProjectStore } from '@/stores/project'
@@ -31,18 +60,53 @@ const projectStore = useProjectStore()
 const chatPanelRef = ref<InstanceType<typeof ChatPanel> | null>(null)
 
 const initialPrompt = ref('')
+const isHistoryCollapsed = ref(false)
+const chatPanelWidth = ref(450)
+const isResizing = ref(false)
+let startX = 0
+let startWidth = 0
 
 onMounted(() => {
-  // 从路由参数获取初始prompt
   const prompt = route.query.prompt as string
   if (prompt) {
     initialPrompt.value = prompt
   }
 })
 
+onUnmounted(() => {
+  document.removeEventListener('mousemove', handleMouseMove)
+  document.removeEventListener('mouseup', handleMouseUp)
+})
+
 function handleNewChat() {
   chatStore.currentSessionId = null
   projectStore.clearProject()
   router.push({ path: '/chat' })
+}
+
+function toggleHistory() {
+  isHistoryCollapsed.value = !isHistoryCollapsed.value
+}
+
+function startResize(e: MouseEvent) {
+  e.preventDefault()
+  isResizing.value = true
+  startX = e.clientX
+  startWidth = chatPanelWidth.value
+  document.addEventListener('mousemove', handleMouseMove)
+  document.addEventListener('mouseup', handleMouseUp)
+}
+
+function handleMouseMove(e: MouseEvent) {
+  if (!isResizing.value) return
+  const diff = e.clientX - startX
+  const newWidth = startWidth + diff
+  chatPanelWidth.value = Math.max(300, Math.min(newWidth, 800))
+}
+
+function handleMouseUp() {
+  isResizing.value = false
+  document.removeEventListener('mousemove', handleMouseMove)
+  document.removeEventListener('mouseup', handleMouseUp)
 }
 </script>

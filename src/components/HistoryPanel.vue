@@ -1,11 +1,16 @@
 <template>
-  <div class="h-full flex flex-col bg-white border-r border-gray-200">
+  <div class="h-full flex flex-col">
     <div class="flex justify-between items-center px-4 py-4 border-b border-gray-200">
       <h3 class="m-0 text-base text-gray-800">历史记录</h3>
-      <el-button text type="primary" size="small" @click="handleNewChat">
-        <el-icon><Plus /></el-icon>
-        新对话
-      </el-button>
+      <div class="flex items-center gap-1">
+        <el-button text type="primary" size="small" @click="handleNewChat">
+          <el-icon><Plus /></el-icon>
+          新对话
+        </el-button>
+        <el-button text size="small" @click="$emit('toggle')" title="收起侧边栏">
+          <el-icon><DArrowLeft /></el-icon>
+        </el-button>
+      </div>
     </div>
 
     <div class="flex-1 overflow-y-auto p-2">
@@ -41,11 +46,12 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Plus, ChatDotRound, Delete } from '@element-plus/icons-vue'
+import { Plus, ChatDotRound, Delete, DArrowLeft } from '@element-plus/icons-vue'
 import { useChatStore } from '@/stores/chat'
 
 const emit = defineEmits<{
   newChat: []
+  toggle: []
 }>()
 
 const chatStore = useChatStore()

@@ -1,7 +1,18 @@
 <template>
   <div class="h-full flex flex-col bg-white">
     <div class="flex justify-between items-center px-4 py-4 border-b border-gray-200">
-      <h3 class="m-0 text-base text-gray-800">AI 对话</h3>
+      <div class="flex items-center gap-2">
+        <el-button
+          v-if="historyCollapsed"
+          text
+          size="small"
+          @click="$emit('toggle-history')"
+          title="展开历史记录"
+        >
+          <el-icon><DArrowRight /></el-icon>
+        </el-button>
+        <h3 class="m-0 text-base text-gray-800">AI 对话</h3>
+      </div>
       <el-tag v-if="currentSession" size="small" type="info">
         {{ currentSession.messages.length }} 条消息
       </el-tag>
@@ -62,16 +73,19 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
+import { DArrowRight } from '@element-plus/icons-vue'
 import { useChatStore } from '@/stores/chat'
 import { useProjectStore } from '@/stores/project'
 import { generateMockProject, generateMockAIResponse, delay } from '@/api/mock'
 
 const props = defineProps<{
   initialPrompt?: string
+  historyCollapsed?: boolean
 }>()
 
 const emit = defineEmits<{
   generated: []
+  'toggle-history': []
 }>()
 
 const chatStore = useChatStore()
