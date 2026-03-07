@@ -56,12 +56,12 @@ export const PACKAGE_JSON = JSON.stringify({
     'element-plus': '^2.9.0'
   },
   devDependencies: {
-    '@vitejs/plugin-vue': '^5.0.0',
+    '@vitejs/plugin-vue': '^6.0.0',
     tailwindcss: '^4.0.0',
     '@tailwindcss/vite': '^4.0.0',
     typescript: '^5.9.0',
     vite: '^7.0.0',
-    'vue-tsc': '^2.0.0'
+    'vue-tsc': '^3.0.0'
   }
 }, null, 2)
 
@@ -81,6 +81,42 @@ export default defineConfig({
 `
 
 export const STYLE_CSS = `@import "tailwindcss";
+`
+
+export const TS_CONFIG = `{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+    "jsx": "preserve",
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"]
+}
+`
+
+export const VITE_ENV_D_TS = `/// <reference types="vite/client" />
+
+declare module '*.vue' {
+  import type { DefineComponent } from 'vue'
+  const component: DefineComponent<{}, {}, any>
+  export default component
+}
 `
 
 export function getBaseProjectFiles(): ProjectFile[] {

@@ -29,6 +29,13 @@
           >
             导出 HTML
           </el-button>
+          <el-button
+            type="warning"
+            :disabled="!hasFiles"
+            @click="exportProject"
+          >
+            导出项目
+          </el-button>
         </div>
       </div>
       
@@ -91,9 +98,11 @@ import { useProjectStore } from '@/stores/project'
 import { useChatStore } from '@/stores/chat'
 import { updateSessionFiles, type ApiFile } from '@/api'
 import { collectAllFiles } from '@/preview/resolver'
+import { getBaseProjectFiles, TS_CONFIG, VITE_ENV_D_TS } from '@/templates/project-template'
 import FileTree from '@/components/FileTree.vue'
 import MonacoEditor from '@/components/MonacoEditor.vue'
 import type { ProjectFile } from '@/types'
+import JSZip from 'jszip'
 
 const projectStore = useProjectStore()
 const chatStore = useChatStore()
@@ -299,6 +308,59 @@ function exportStaticHtml() {
   } catch (error) {
     console.error('Export failed:', error)
     ElMessage.error('导出失败，可能是跨域限制')
+  }
+}
+
+async function exportProject() {
+  const zip = new JSZip()
+
+  zip.file('package.json', getBaseProjectFiles().find(f => f.name === 'package.json')!.content)
+  zip.file('vite.config.ts', getBaseProjectFiles().find(f => f.name === 'vite.config.ts')!.content)
+  zip.file('tsconfig.json', TS_CONFIG)
+
+  const indexHtml = getBaseProjectFiles().find(f => f.name === 'index.html')!.content
+  zip.file('index.html', indexHtml)
+
+  const srcFolder = zip.folder('src')
+  if (!srcFolder) {
+    ElMessage.error('创建 src 目录失败')
+    return
+  }
+
+  srcFolder.file('main.ts', getBaseProjectFiles().find(f => f.name === 'main.ts')!.content)
+  srcFolder.file('App.vue', getBaseProjectFiles().find(f => f.name === 'App.vue')!.content)
+  srcFolder.file('style.css', getBaseProjectFiles().find(f => f.name === 'style.css')!.content)
+  srcFolder.file('vite-env.d.ts', VITE_ENV_D_TS)
+
+  const allFiles = collectAllFiles(projectStore.files)
+  const userFiles = allFiles.filter(f => 
+    f.type === 'file' && 
+    !f.readonly && 
+    f.content &&
+    !['main.ts', 'App.vue', 'style.css', 'index.html', 'package.json', 'vite.config.ts'].includes(f.name)
+  )
+
+  for (const file of userFiles) {
+    const filePath = file.path.startsWith('/') ? file.path.slice(1) : file.path
+    if (filePath.startsWith('src/')) {
+      srcFolder.file(filePath.replace('src/', ''), file.content!)
+    } else {
+      zip.file(filePath, file.content!)
+    }
+  }
+
+  try {
+    const blob = await zip.generateAsync({ type: 'blob' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = 'vue-project.zip'
+    a.click()
+    URL.revokeObjectURL(url)
+    ElMessage.success('项目导出成功')
+  } catch (error) {
+    console.error('Export project failed:', error)
+    ElMessage.error('导出项目失败')
   }
 }
 
