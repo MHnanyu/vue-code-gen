@@ -16,7 +16,7 @@
             :default-expanded-ids="editableFolderIds"
             @select="$emit('select', $event)"
             @delete="$emit('delete', $event)"
-            @rename="$emit('rename', $event)"
+            @rename="(file, newName) => $emit('rename', file, newName)"
           />
         </div>
       </div>

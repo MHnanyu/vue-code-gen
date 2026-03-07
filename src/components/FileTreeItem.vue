@@ -57,7 +57,7 @@
         :default-expanded-ids="defaultExpandedIds"
         @select="$emit('select', $event)"
         @delete="$emit('delete', $event)"
-        @rename="$emit('rename', $event)"
+        @rename="(file, newName) => $emit('rename', file, newName)"
       />
     </div>
   </div>
@@ -130,7 +130,14 @@ function handleRenameSubmit() {
   if (!isEditing.value) return
   
   const newName = editName.value.trim()
-  if (newName && newName !== props.node.name) {
+  
+  if (!newName) {
+    editName.value = props.node.name
+    isEditing.value = false
+    return
+  }
+  
+  if (newName !== props.node.name) {
     emit('rename', props.node, newName)
   }
   isEditing.value = false
@@ -161,11 +168,15 @@ function getFileIconColor(language: string): string {
 <style scoped>
 .edit-input {
   flex: 1;
-  height: 20px;
-  padding: 0 4px;
+  max-width: 120px;
+  height: 22px;
+  padding: 0 6px;
   border: 1px solid #409eff;
-  border-radius: 2px;
+  border-radius: 4px;
   outline: none;
   font-size: inherit;
+  font-family: inherit;
+  line-height: 20px;
+  background: #fff;
 }
 </style>

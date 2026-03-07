@@ -29,6 +29,7 @@
         <Repl
           :store="replStore"
           :editor="Monaco"
+          :preview-options="previewOptions"
           :show-compile-output="false"
           :show-import-map="false"
           :show-ts-config="false"
@@ -100,6 +101,21 @@ const replStore = useStore({
   })),
 })
 
+const previewOptions = {
+  headHTML: `
+    <link rel="stylesheet" href="https://unpkg.com/element-plus@2.4.4/dist/index.css">
+    <script src="https://cdn.tailwindcss.com"><\/script>
+    <style>
+      blockquote {
+        border-left: 4px solid #e5e7eb;
+        padding-left: 1rem;
+        margin: 1rem 0;
+        color: #6b7280;
+      }
+    </style>
+  `
+}
+
 const SUPPORTED_EXTS = /\.(vue|ts|tsx|js|jsx)$/
 
 function normalizeImports(content: string, filename: string): string {
@@ -110,32 +126,13 @@ function normalizeImports(content: string, filename: string): string {
     if (scriptMatch && !scriptMatch[2].includes('element-plus')) {
       const needsVueImports = []
       if (!scriptMatch[2].includes('getCurrentInstance')) needsVueImports.push('getCurrentInstance')
-      if (!scriptMatch[2].includes('onMounted')) needsVueImports.push('onMounted')
       
       const vueImport = needsVueImports.length > 0 
         ? `import { ${needsVueImports.join(', ')} } from 'vue'\n` 
         : ''
       
-      const cssInject = `onMounted(() => {
-  if (!document.querySelector('link[data-element-plus-css]')) {
-    const link = document.createElement('link')
-    link.rel = 'stylesheet'
-    link.href = 'https://unpkg.com/element-plus@2.4.4/dist/index.css'
-    link.dataset.elementPlusCss = 'true'
-    document.head.appendChild(link)
-  }
-  if (!document.querySelector('script[data-tailwind]')) {
-    const script = document.createElement('script')
-    script.src = 'https://cdn.tailwindcss.com'
-    script.dataset.tailwind = 'true'
-    document.head.appendChild(script)
-  }
-})
-`
-      
       const newScript = scriptMatch[1] + 
         `\n${vueImport}import ElementPlus from 'element-plus'\n` +
-        cssInject +
         `const instance = getCurrentInstance()\n` +
         `const app = instance?.appContext.app\n` +
         `if (app && !app._elementPlusRegistered) {\n` +
