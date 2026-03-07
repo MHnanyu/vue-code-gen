@@ -1,31 +1,33 @@
 <template>
-  <div class="history-panel">
-    <div class="panel-header">
-      <h3>历史记录</h3>
+  <div class="h-full flex flex-col bg-white border-r border-gray-200">
+    <div class="flex justify-between items-center px-4 py-4 border-b border-gray-200">
+      <h3 class="m-0 text-base text-gray-800">历史记录</h3>
       <el-button text type="primary" size="small" @click="handleNewChat">
         <el-icon><Plus /></el-icon>
         新对话
       </el-button>
     </div>
 
-    <div class="history-list">
+    <div class="flex-1 overflow-y-auto p-2">
       <div
         v-for="session in sortedSessions"
         :key="session.id"
-        class="history-item"
-        :class="{ active: session.id === currentSessionId }"
+        class="flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all mb-1 hover:bg-gray-50"
+        :class="session.id === currentSessionId ? 'bg-blue-50' : ''"
         @click="selectSession(session.id)"
       >
-        <div class="item-content">
-          <el-icon class="item-icon"><ChatDotRound /></el-icon>
-          <div class="item-info">
-            <div class="item-title">{{ session.title }}</div>
-            <div class="item-time">{{ formatTime(session.updatedAt) }}</div>
+        <div class="flex items-center gap-3 flex-1 min-w-0">
+          <el-icon class="text-gray-400 text-lg"><ChatDotRound /></el-icon>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis">
+              {{ session.title }}
+            </div>
+            <div class="text-xs text-gray-400 mt-1">{{ formatTime(session.updatedAt) }}</div>
           </div>
         </div>
         <el-button
           text
-          class="delete-btn"
+          class="opacity-0 transition-opacity group-hover:opacity-100"
           @click.stop="handleDelete(session.id)"
         >
           <el-icon><Delete /></el-icon>
@@ -79,94 +81,6 @@ function formatTime(date: Date): string {
 </script>
 
 <style scoped>
-.history-panel {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-  border-right: 1px solid #e4e7ed;
-}
-
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  border-bottom: 1px solid #eee;
-}
-
-.panel-header h3 {
-  margin: 0;
-  font-size: 16px;
-  color: #303133;
-}
-
-.history-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-}
-
-.history-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-  margin-bottom: 4px;
-}
-
-.history-item:hover {
-  background: #f5f7fa;
-}
-
-.history-item.active {
-  background: #ecf5ff;
-}
-
-.item-content {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: 1;
-  min-width: 0;
-}
-
-.item-icon {
-  color: #909399;
-  font-size: 18px;
-}
-
-.item-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.item-title {
-  font-size: 14px;
-  color: #303133;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.item-time {
-  font-size: 12px;
-  color: #909399;
-  margin-top: 4px;
-}
-
-.delete-btn {
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.history-item:hover .delete-btn {
-  opacity: 1;
-}
-
 :deep(.el-empty) {
   padding: 40px 0;
 }

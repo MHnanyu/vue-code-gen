@@ -1,17 +1,14 @@
 <template>
-  <div class="chat-view">
-    <!-- 左侧：历史记录 -->
-    <div class="left-panel">
+  <div class="grid grid-cols-[260px_1fr_1fr] h-[calc(100vh-60px)] bg-gray-100">
+    <div class="bg-white overflow-hidden">
       <HistoryPanel @new-chat="handleNewChat" />
     </div>
 
-    <!-- 中间：对话区域 -->
-    <div class="middle-panel">
+    <div class="border-l border-r border-gray-200 overflow-hidden">
       <ChatPanel :initial-prompt="initialPrompt" ref="chatPanelRef" />
     </div>
 
-    <!-- 右侧：生成结果 -->
-    <div class="right-panel">
+    <div class="overflow-hidden">
       <ResultPanel />
     </div>
   </div>
@@ -44,34 +41,8 @@ onMounted(() => {
 })
 
 function handleNewChat() {
-  // 清空当前会话，开始新对话
   chatStore.currentSessionId = null
   projectStore.clearProject()
   router.push({ path: '/chat' })
 }
 </script>
-
-<style scoped>
-.chat-view {
-  display: grid;
-  grid-template-columns: 260px 1fr 1fr;
-  gap: 0;
-  height: calc(100vh - 60px);
-  background: #f0f2f5;
-}
-
-.left-panel {
-  background: #fff;
-  overflow: hidden;
-}
-
-.middle-panel {
-  border-left: 1px solid #e4e7ed;
-  border-right: 1px solid #e4e7ed;
-  overflow: hidden;
-}
-
-.right-panel {
-  overflow: hidden;
-}
-</style>

@@ -1,13 +1,16 @@
 <template>
-  <div class="file-tree">
+  <div class="text-sm">
     <div class="tree-node" v-for="node in files" :key="node.id">
       <div
-        class="node-item"
-        :class="{ active: node.id === selectedFileId, folder: node.type === 'folder' }"
+        class="flex items-center gap-2 p-2 cursor-pointer rounded transition-colors hover:bg-gray-50"
+        :class="[
+          node.id === selectedFileId ? 'bg-blue-50 text-blue-500' : '',
+          node.type === 'folder' ? 'font-medium' : ''
+        ]"
         :style="{ paddingLeft: `${depth * 16 + 8}px` }"
         @click="handleClick(node)"
       >
-        <span class="node-icon">
+        <span class="flex items-center">
           <template v-if="node.type === 'folder'">
             <el-icon v-if="isExpanded(node.id)" color="#e6a23c"><FolderOpened /></el-icon>
             <el-icon v-else color="#e6a23c"><Folder /></el-icon>
@@ -16,10 +19,9 @@
             <el-icon :color="getFileIconColor(node.language || '')"><Document /></el-icon>
           </template>
         </span>
-        <span class="node-name">{{ node.name }}</span>
+        <span class="flex-1 whitespace-nowrap overflow-hidden text-ellipsis">{{ node.name }}</span>
       </div>
 
-      <!-- 子节点 -->
       <div v-if="node.type === 'folder' && node.children && isExpanded(node.id)" class="tree-children">
         <FileTreeItem
           :files="node.children"
@@ -83,53 +85,7 @@ function getFileIconColor(language: string): string {
 </script>
 
 <script lang="ts">
-// 递归组件需要单独定义name
 export default {
   name: 'FileTreeItem'
 }
 </script>
-
-<style scoped>
-.file-tree {
-  font-size: 14px;
-}
-
-.node-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background 0.2s;
-}
-
-.node-item:hover {
-  background: #f5f7fa;
-}
-
-.node-item.active {
-  background: #ecf5ff;
-  color: #409eff;
-}
-
-.node-item.folder {
-  font-weight: 500;
-}
-
-.node-icon {
-  display: flex;
-  align-items: center;
-}
-
-.node-name {
-  flex: 1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.tree-children {
-  /* 子节点样式 */
-}
-</style>

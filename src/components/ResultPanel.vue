@@ -1,9 +1,9 @@
 <template>
-  <div class="result-panel">
-    <div v-if="!hasFiles" class="empty-state">
+  <div class="h-full flex flex-col bg-white">
+    <div v-if="!hasFiles" class="flex-1 flex items-center justify-center">
       <el-empty description="生成代码后显示预览" :image-size="80">
         <template #image>
-          <span style="font-size: 48px">🎨</span>
+          <span class="text-5xl">🎨</span>
         </template>
       </el-empty>
     </div>
@@ -135,20 +135,6 @@ watch(() => projectStore.files, debouncedSync, { deep: true, immediate: true })
 </script>
 
 <style scoped>
-.result-panel {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-}
-
-.empty-state {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .result-tabs {
   flex-shrink: 0;
 }
@@ -169,21 +155,21 @@ watch(() => projectStore.files, debouncedSync, { deep: true, immediate: true })
   overflow: hidden;
 }
 
-/* preview tab: 隐藏编辑器，只显示预览 */
 .repl-wrapper.preview :deep(.split-pane > .left),
 .repl-wrapper.preview :deep(.split-pane > .dragger) {
   display: none !important;
 }
+
 .repl-wrapper.preview :deep(.split-pane > .right) {
   width: 100% !important;
   height: 100% !important;
 }
 
-/* code tab: 隐藏预览，只显示编辑器 */
 .repl-wrapper.code :deep(.split-pane > .right),
 .repl-wrapper.code :deep(.split-pane > .dragger) {
   display: none !important;
 }
+
 .repl-wrapper.code :deep(.split-pane > .left) {
   width: 100% !important;
   height: 100% !important;
@@ -191,7 +177,6 @@ watch(() => projectStore.files, debouncedSync, { deep: true, immediate: true })
   flex-direction: row !important;
 }
 
-/* 文件列表变成垂直侧边栏 */
 .repl-wrapper.code :deep(.file-selector) {
   display: flex;
   flex-direction: column;
@@ -204,13 +189,13 @@ watch(() => projectStore.files, debouncedSync, { deep: true, immediate: true })
   border-bottom: none;
   flex-shrink: 0;
 }
+
 .repl-wrapper.code :deep(.file-selector .file) {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* 编辑器占满剩余空间 */
 .repl-wrapper.code :deep(.editor-container) {
   flex: 1;
   overflow: hidden;

@@ -1,13 +1,15 @@
 <template>
-  <div class="home-view">
-    <div class="hero-content">
-      <h1 class="title">
-        <span class="title-icon">✨</span>
-        <span class="title-text">Page Generator</span>
+  <div class="min-h-[calc(100vh-60px)] flex items-center justify-center px-6 py-10 bg-gradient-to-br from-blue-50 to-indigo-100">
+    <div class="max-w-3xl w-full text-center">
+      <h1 class="text-5xl font-semibold text-gray-800 mb-3 flex items-center justify-center gap-3 leading-normal">
+        <span class="text-4xl">✨</span>
+        <span class="bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent leading-normal">
+          Page Generator
+        </span>
       </h1>
-      <p class="subtitle">输入需求，智能生成页面原型</p>
+      <p class="text-xl text-gray-600 mb-10">输入需求，智能生成页面原型</p>
 
-      <el-card class="input-card" shadow="always">
+      <el-card class="rounded-2xl mb-6" shadow="always">
         <el-input
           v-model="prompt"
           type="textarea"
@@ -17,8 +19,8 @@
           @keydown.enter.ctrl="handleGenerate"
         />
 
-        <div class="toolbar">
-          <div class="selectors">
+        <div class="flex justify-between items-center mt-4 pt-4 border-t border-gray-200">
+          <div class="flex gap-3 items-center">
             <el-tag type="success" effect="plain" size="large">Vue3</el-tag>
             <el-select v-model="selectedLib" style="width: 140px">
               <el-option label="ElementUI" value="ElementUI" />
@@ -32,9 +34,9 @@
         </div>
       </el-card>
 
-      <div class="supported-libs">
+      <div class="text-gray-400 text-sm">
         支持的组件库：
-        <el-tag v-for="lib in libs" :key="lib" effect="dark" round>{{ lib }}</el-tag>
+        <el-tag v-for="lib in libs" :key="lib" effect="dark" round class="ml-2">{{ lib }}</el-tag>
       </div>
     </div>
   </div>
@@ -66,85 +68,13 @@ function handleGenerate() {
 </script>
 
 <style scoped>
-.home-view {
-  min-height: calc(100vh - 60px);
-  background: linear-gradient(135deg, #e8f4f8 0%, #e6f0ff 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 24px;
-}
-
-.hero-content {
-  max-width: 800px;
-  width: 100%;
-  text-align: center;
-}
-
-.title {
-  font-size: 42px;
-  color: #303133;
-  margin-bottom: 12px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-}
-
-.title-icon {
-  font-size: 36px;
-}
-
-.title-text {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.subtitle {
-  font-size: 20px;
-  color: #606266;
-  margin-bottom: 40px;
-}
-
-.input-card {
-  border-radius: 16px;
-  margin-bottom: 24px;
-}
-
-.input-card :deep(.el-card__body) {
+:deep(.el-card__body) {
   padding: 24px;
 }
 
-.input-card :deep(.el-textarea__inner) {
+:deep(.el-textarea__inner) {
   font-size: 16px;
   line-height: 1.6;
   box-shadow: none;
-}
-
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #eee;
-}
-
-.selectors {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.supported-libs {
-  color: #909399;
-  font-size: 14px;
-}
-
-.supported-libs .el-tag {
-  margin-left: 8px;
 }
 </style>

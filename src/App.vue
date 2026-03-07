@@ -1,7 +1,7 @@
 <template>
-  <div class="app">
+  <div class="min-h-screen bg-gray-50">
     <AppHeader />
-    <main class="main-content">
+    <main class="min-h-[calc(100vh-60px)]">
       <router-view />
     </main>
   </div>
@@ -10,14 +10,3 @@
 <script setup lang="ts">
 import AppHeader from './components/AppHeader.vue'
 </script>
-
-<style>
-.app {
-  min-height: 100vh;
-  background: #f5f7fa;
-}
-
-.main-content {
-  min-height: calc(100vh - 60px);
-}
-</style>

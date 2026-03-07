@@ -1,39 +1,47 @@
 <template>
-  <div class="chat-panel">
-    <div class="chat-header">
-      <h3>AI 对话</h3>
+  <div class="h-full flex flex-col bg-white">
+    <div class="flex justify-between items-center px-4 py-4 border-b border-gray-200">
+      <h3 class="m-0 text-base text-gray-800">AI 对话</h3>
       <el-tag v-if="currentSession" size="small" type="info">
         {{ currentSession.messages.length }} 条消息
       </el-tag>
     </div>
 
-    <div class="chat-messages" ref="messagesContainer">
+    <div class="flex-1 overflow-y-auto p-4" ref="messagesContainer">
       <template v-if="currentSession?.messages.length">
         <div
           v-for="message in currentSession.messages"
           :key="message.id"
-          class="message"
-          :class="message.role"
+          class="flex gap-3 mb-5"
+          :class="message.role === 'user' ? 'flex-row-reverse' : ''"
         >
-          <div class="message-avatar">
+          <div class="flex-shrink-0">
             <el-avatar :size="32" :style="{ background: message.role === 'user' ? '#409eff' : '#67c23a' }">
               {{ message.role === 'user' ? 'U' : 'AI' }}
             </el-avatar>
           </div>
-          <div class="message-content">
-            <div class="message-text">{{ message.content }}</div>
-            <div class="message-time">{{ formatTime(message.timestamp) }}</div>
+          <div 
+            class="max-w-[80%]"
+            :class="message.role === 'user' ? 'flex flex-col items-end' : ''"
+          >
+            <div 
+              class="px-4 py-3 rounded-xl leading-relaxed break-words"
+              :class="message.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-100'"
+            >
+              {{ message.content }}
+            </div>
+            <div class="text-xs text-gray-400 mt-1">{{ formatTime(message.timestamp) }}</div>
           </div>
         </div>
       </template>
       <el-empty v-else description="开始新的对话吧" :image-size="80">
         <template #image>
-          <span style="font-size: 48px">💬</span>
+          <span class="text-5xl">💬</span>
         </template>
       </el-empty>
     </div>
 
-    <div class="chat-input">
+    <div class="px-4 py-4 border-t border-gray-200">
       <el-input
         v-model="inputMessage"
         type="textarea"
@@ -42,8 +50,8 @@
         resize="none"
         @keydown.enter.ctrl="sendMessage"
       />
-      <div class="input-actions">
-        <span class="hint">Ctrl + Enter 发送</span>
+      <div class="flex justify-between items-center mt-3">
+        <span class="text-xs text-gray-400">Ctrl + Enter 发送</span>
         <el-button type="primary" :loading="isLoading" :disabled="!inputMessage.trim()" @click="sendMessage">
           发送
         </el-button>
@@ -144,93 +152,6 @@ watch(() => props.initialPrompt, (prompt) => {
 </script>
 
 <style scoped>
-.chat-panel {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-}
-
-.chat-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  border-bottom: 1px solid #eee;
-}
-
-.chat-header h3 {
-  margin: 0;
-  font-size: 16px;
-  color: #303133;
-}
-
-.chat-messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-}
-
-.message {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.message.user {
-  flex-direction: row-reverse;
-}
-
-.message-avatar {
-  flex-shrink: 0;
-}
-
-.message-content {
-  max-width: 80%;
-}
-
-.message.user .message-content {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-
-.message-text {
-  padding: 12px 16px;
-  border-radius: 12px;
-  background: #f5f7fa;
-  line-height: 1.6;
-  word-break: break-word;
-}
-
-.message.user .message-text {
-  background: #409eff;
-  color: white;
-}
-
-.message-time {
-  font-size: 12px;
-  color: #909399;
-  margin-top: 4px;
-}
-
-.chat-input {
-  padding: 16px;
-  border-top: 1px solid #eee;
-}
-
-.input-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 12px;
-}
-
-.hint {
-  font-size: 12px;
-  color: #909399;
-}
-
 :deep(.el-empty) {
   flex: 1;
   display: flex;
