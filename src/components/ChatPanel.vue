@@ -77,7 +77,7 @@ import { DArrowRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useChatStore } from '@/stores/chat'
 import { useProjectStore } from '@/stores/project'
-import { generateCode, transformApiFiles } from '@/api'
+import { generateCode } from '@/api'
 import { buildProjectFiles } from '@/templates/project-template'
 import type { ProjectFile } from '@/types'
 
@@ -130,7 +130,6 @@ async function sendMessage() {
   if (!message || isLoading.value) return
 
   inputMessage.value = ''
-
   let sessionId = chatStore.currentSessionId
   if (!sessionId) {
     sessionId = await chatStore.createSessionRemote(message)
@@ -139,7 +138,6 @@ async function sendMessage() {
 
   chatStore.addMessageLocal(sessionId, { role: 'user', content: message })
   scrollToBottom()
-
   chatStore.setLoading(true)
 
   try {
@@ -161,7 +159,8 @@ async function sendMessage() {
     const projectFiles = buildProjectFiles(mainPageContent, extraFiles)
     projectStore.setFiles(projectFiles)
 
-    chatStore.addMessageLocal(sessionId, { role: 'assistant', content: result.message })
+    ElMessage.success('生成成功')
+    await chatStore.loadSession(sessionId)
   } catch (error) {
     ElMessage.error('生成失败: ' + (error as Error).message)
   } finally {

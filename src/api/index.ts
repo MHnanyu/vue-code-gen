@@ -29,11 +29,14 @@ interface ApiFile {
   children?: ApiFile[]
 }
 
+export type { ApiFile }
+
 interface ApiSession {
   id: string
   userId?: string | null
   title: string
   messages?: ApiMessage[]
+  files?: ApiFile[]
   createdAt: string
   updatedAt: string
 }
@@ -148,6 +151,7 @@ export function transformApiSession(session: ApiSession) {
       content: msg.content,
       timestamp: new Date(msg.timestamp),
     })),
+    files: session.files,
     createdAt: new Date(session.createdAt),
     updatedAt: new Date(session.updatedAt),
   }

@@ -62,6 +62,26 @@ const currentSessionId = computed(() => chatStore.currentSessionId)
 async function selectSession(id: string) {
   await chatStore.loadSession(id)
   chatStore.selectSession(id)
+  
+  const session = chatStore.sessions.find(s => s.id === id)
+  if (session && session.files && session.files.length > 0) {
+    const projectStore = await import('@/stores/project').then(m => m.useProjectStore())
+    const { buildProjectFiles } = await import('@/templates/project-template')
+    const mainPageContent = session.files[0]?.content || ''
+    const extraFiles = session.files.slice(1).map((f: any) => ({
+      id: f.id,
+      name: f.name,
+      path: f.path,
+      type: f.type as 'file',
+      language: f.language,
+      content: f.content,
+    }))
+    const projectFiles = buildProjectFiles(mainPageContent, extraFiles)
+    projectStore.setFiles(projectFiles)
+  } else {
+    const projectStore = await import('@/stores/project').then(m => m.useProjectStore())
+    projectStore.clearProject()
+  }
 }
 
 function handleDelete(id: string) {

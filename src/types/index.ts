@@ -1,3 +1,5 @@
+import type { ApiFile } from '@/api'
+
 // 对话消息类型
 export interface ChatMessage {
   id: string
@@ -11,6 +13,7 @@ export interface ChatSession {
   id: string
   title: string
   messages: ChatMessage[]
+  files?: ApiFile[]
   createdAt: Date
   updatedAt: Date
 }

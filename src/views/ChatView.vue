@@ -71,12 +71,60 @@ onMounted(async () => {
   if (sessionId) {
     await chatStore.loadSession(sessionId)
     chatStore.selectSession(sessionId)
+    
+    const session = chatStore.sessions.find(s => s.id === sessionId)
+    if (session && session.files && session.files.length > 0) {
+      const { buildProjectFiles } = await import('@/templates/project-template')
+      const mainPageContent = session.files[0]?.content || ''
+      const extraFiles = session.files.slice(1).map((f) => ({
+        id: f.id,
+        name: f.name,
+        path: f.path,
+        type: f.type as 'file',
+        language: f.language as any,
+        content: f.content,
+      }))
+      const projectFiles = buildProjectFiles(mainPageContent, extraFiles)
+      projectStore.setFiles(projectFiles)
+    } else {
+      projectStore.clearProject()
+    }
+  } else {
+    projectStore.clearProject()
   }
 })
 
-watch(() => chatStore.currentSessionId, (id) => {
-  if (id && route.query.session_id !== id) {
+watch(() => chatStore.currentSessionId, async (id) => {
+  if (!id) {
+    projectStore.clearProject()
+    return
+  }
+  
+  if (route.query.session_id !== id) {
     router.replace({ path: '/chat', query: { session_id: id } })
+  }
+  
+  const session = chatStore.sessions.find(s => s.id === id)
+  if (!session) {
+    projectStore.clearProject()
+    return
+  }
+  
+  if (session.files && session.files.length > 0) {
+    const { buildProjectFiles } = await import('@/templates/project-template')
+    const mainPageContent = session.files[0]?.content || ''
+    const extraFiles = session.files.slice(1).map((f) => ({
+      id: f.id,
+      name: f.name,
+      path: f.path,
+      type: f.type as 'file',
+      language: f.language as any,
+      content: f.content,
+    }))
+    const projectFiles = buildProjectFiles(mainPageContent, extraFiles)
+    projectStore.setFiles(projectFiles)
+  } else {
+    projectStore.clearProject()
   }
 })
 
