@@ -157,3 +157,14 @@ export function transformApiSession(session: ApiSession) {
     updatedAt: new Date(session.updatedAt),
   }
 }
+
+interface UpdateFilesRequest {
+  files: ApiFile[]
+}
+
+export async function updateSessionFiles(sessionId: string, files: ApiFile[]): Promise<void> {
+  return request(`/api/sessions/${sessionId}/files`, {
+    method: 'PATCH',
+    body: JSON.stringify({ files } as UpdateFilesRequest),
+  })
+}

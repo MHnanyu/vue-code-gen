@@ -91,7 +91,8 @@ export function getBaseProjectFiles(): ProjectFile[] {
       path: '/src/main.ts',
       type: 'file',
       language: 'typescript',
-      content: MAIN_TS
+      content: MAIN_TS,
+      readonly: true
     },
     {
       id: 'app-vue',
@@ -99,7 +100,8 @@ export function getBaseProjectFiles(): ProjectFile[] {
       path: '/src/App.vue',
       type: 'file',
       language: 'vue',
-      content: APP_VUE
+      content: APP_VUE,
+      readonly: true
     },
     {
       id: 'style-css',
@@ -107,7 +109,8 @@ export function getBaseProjectFiles(): ProjectFile[] {
       path: '/src/style.css',
       type: 'file',
       language: 'css',
-      content: STYLE_CSS
+      content: STYLE_CSS,
+      readonly: true
     },
     {
       id: 'index-html',
@@ -115,7 +118,8 @@ export function getBaseProjectFiles(): ProjectFile[] {
       path: '/public/index.html',
       type: 'file',
       language: 'html',
-      content: INDEX_HTML
+      content: INDEX_HTML,
+      readonly: true
     },
     {
       id: 'package-json',
@@ -123,7 +127,8 @@ export function getBaseProjectFiles(): ProjectFile[] {
       path: '/package.json',
       type: 'file',
       language: 'json',
-      content: PACKAGE_JSON
+      content: PACKAGE_JSON,
+      readonly: true
     },
     {
       id: 'vite-config',
@@ -131,7 +136,8 @@ export function getBaseProjectFiles(): ProjectFile[] {
       path: '/vite.config.ts',
       type: 'file',
       language: 'typescript',
-      content: VITE_CONFIG_TS
+      content: VITE_CONFIG_TS,
+      readonly: true
     }
   ]
 }

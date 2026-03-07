@@ -6,10 +6,13 @@
 import { ref, onMounted, onUnmounted, watch } from 'vue'
 import * as monaco from 'monaco-editor'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   value: string
   language: string
-}>()
+  readonly?: boolean
+}>(), {
+  readonly: false
+})
 
 const emit = defineEmits<{
   'update:value': [value: string]
@@ -30,7 +33,8 @@ onMounted(() => {
       lineNumbers: 'on',
       scrollBeyondLastLine: false,
       wordWrap: 'on',
-      tabSize: 2
+      tabSize: 2,
+      readOnly: props.readonly
     })
 
     editor.onDidChangeModelContent(() => {
@@ -52,6 +56,12 @@ watch(() => props.language, (newLang) => {
     if (model) {
       monaco.editor.setModelLanguage(model, newLang)
     }
+  }
+})
+
+watch(() => props.readonly, (newValue) => {
+  if (editor) {
+    editor.updateOptions({ readOnly: newValue })
   }
 })
 

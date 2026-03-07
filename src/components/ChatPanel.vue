@@ -148,8 +148,19 @@ async function sendMessage() {
       files: currentSession.value?.files,
     })
 
-    const mainPageContent = result.files[0]?.content || ''
-    const extraFiles: ProjectFile[] = result.files.slice(1).map((f) => ({
+    const SYSTEM_FILE_PATHS = new Set([
+      '/src/main.ts',
+      '/src/App.vue',
+      '/src/style.css',
+      '/public/index.html',
+      '/package.json',
+      '/vite.config.ts',
+    ])
+
+    const userFiles = result.files.filter(f => !SYSTEM_FILE_PATHS.has(f.path))
+
+    const mainPageContent = userFiles[0]?.content || ''
+    const extraFiles: ProjectFile[] = userFiles.slice(1).map((f) => ({
       id: f.id,
       name: f.name,
       path: f.path,
@@ -159,7 +170,7 @@ async function sendMessage() {
     }))
     const projectFiles = buildProjectFiles(mainPageContent, extraFiles)
     projectStore.setFiles(projectFiles)
-    chatStore.updateSessionFiles(sessionId, result.files)
+    chatStore.updateSessionFiles(sessionId, userFiles)
     chatStore.addMessageLocal(sessionId, { role: 'assistant', content: result.message })
 
     ElMessage.success('生成成功')

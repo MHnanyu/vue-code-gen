@@ -27,4 +27,5 @@ export interface ProjectFile {
   content?: string
   language?: 'vue' | 'typescript' | 'javascript' | 'css' | 'html' | 'json'
   children?: ProjectFile[]
+  readonly?: boolean
 }

@@ -59,6 +59,19 @@ const chatStore = useChatStore()
 const sortedSessions = computed(() => chatStore.sortedSessions)
 const currentSessionId = computed(() => chatStore.currentSessionId)
 
+const SYSTEM_FILE_PATHS = new Set([
+  '/src/main.ts',
+  '/src/App.vue',
+  '/src/style.css',
+  '/public/index.html',
+  '/package.json',
+  '/vite.config.ts',
+])
+
+function filterUserFiles(files: any[]) {
+  return files.filter(f => !SYSTEM_FILE_PATHS.has(f.path))
+}
+
 async function selectSession(id: string) {
   await chatStore.loadSession(id)
   chatStore.selectSession(id)
@@ -67,8 +80,9 @@ async function selectSession(id: string) {
   if (session && session.files && session.files.length > 0) {
     const projectStore = await import('@/stores/project').then(m => m.useProjectStore())
     const { buildProjectFiles } = await import('@/templates/project-template')
-    const mainPageContent = session.files[0]?.content || ''
-    const extraFiles = session.files.slice(1).map((f: any) => ({
+    const userFiles = filterUserFiles(session.files)
+    const mainPageContent = userFiles[0]?.content || ''
+    const extraFiles = userFiles.slice(1).map((f: any) => ({
       id: f.id,
       name: f.name,
       path: f.path,

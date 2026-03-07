@@ -8,11 +8,24 @@
       </el-empty>
     </div>
     <template v-else>
-      <el-tabs v-model="activeTab" class="result-tabs">
-        <el-tab-pane label="Preview" name="preview" />
-        <el-tab-pane label="Code" name="code" />
-      </el-tabs>
-      <div class="repl-wrapper" :class="activeTab">
+      <div class="toolbar">
+        <el-tabs v-model="activeTab" class="result-tabs">
+          <el-tab-pane label="Preview" name="preview" />
+          <el-tab-pane label="Code" name="code" />
+        </el-tabs>
+        <div class="toolbar-actions">
+          <el-button
+            type="success"
+            :loading="isSaving"
+            :disabled="!projectStore.isModified"
+            @click="handleSave"
+          >
+            保存回传
+          </el-button>
+        </div>
+      </div>
+      
+      <div v-if="activeTab === 'preview'" class="repl-wrapper preview flex-1">
         <Repl
           :store="replStore"
           :editor="Monaco"
@@ -23,21 +36,57 @@
           layout="vertical"
         />
       </div>
+      
+      <div v-else class="code-editor-wrapper flex-1 flex">
+        <div class="file-tree-panel">
+          <FileTree
+            :files="projectStore.files"
+            :selected-file-id="projectStore.selectedFileId"
+            @select="handleSelectFile"
+            @add-file="handleAddFile"
+            @delete="handleDeleteFile"
+            @rename="handleRenameFile"
+          />
+        </div>
+        <div class="editor-panel flex-1">
+          <div v-if="selectedFile" class="editor-header">
+            <span>{{ selectedFile.name }}</span>
+            <el-tag v-if="selectedFile.readonly" size="small" type="info">只读</el-tag>
+          </div>
+          <MonacoEditor
+            v-if="selectedFile"
+            :value="selectedFile.content || ''"
+            :language="selectedFile.language || 'typescript'"
+            :readonly="selectedFile.readonly || false"
+            @update:value="handleContentChange"
+          />
+          <el-empty v-else description="选择文件进行编辑" :image-size="60" />
+        </div>
+      </div>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useDebounceFn } from '@vueuse/core'
-import { Repl, useStore, useVueImportMap, File } from '@vue/repl'
+import { Repl, useStore, useVueImportMap } from '@vue/repl'
 import Monaco from '@vue/repl/monaco-editor'
 import { useProjectStore } from '@/stores/project'
+import { useChatStore } from '@/stores/chat'
+import { updateSessionFiles, type ApiFile } from '@/api'
 import { collectAllFiles } from '@/preview/resolver'
+import FileTree from '@/components/FileTree.vue'
+import MonacoEditor from '@/components/MonacoEditor.vue'
+import type { ProjectFile } from '@/types'
 
 const projectStore = useProjectStore()
+const chatStore = useChatStore()
 const activeTab = ref('preview')
+const isSaving = ref(false)
 const hasFiles = computed(() => projectStore.files.length > 0)
+const selectedFile = computed(() => projectStore.selectedFile)
 
 const { importMap: vueImportMap } = useVueImportMap()
 
@@ -51,14 +100,11 @@ const replStore = useStore({
   })),
 })
 
-// @vue/repl 的 resolveImport 只处理 "./" 前缀（转成 "src/"），不支持 "../" 和 "@/"
-// 方案：所有文件扁平化到 src/ 根，import 路径统一改成 "./文件名"
 const SUPPORTED_EXTS = /\.(vue|ts|tsx|js|jsx)$/
 
 function normalizeImports(content: string, filename: string): string {
   let result = content
 
-  // 为 App.vue 自动添加 Element Plus 和 Tailwind CSS
   if (filename === 'App.vue') {
     const scriptMatch = result.match(/(<script\s+setup[^>]*>)([\s\S]*?)(<\/script>)/)
     if (scriptMatch && !scriptMatch[2].includes('element-plus')) {
@@ -71,7 +117,6 @@ function normalizeImports(content: string, filename: string): string {
         : ''
       
       const cssInject = `onMounted(() => {
-  // Element Plus CSS
   if (!document.querySelector('link[data-element-plus-css]')) {
     const link = document.createElement('link')
     link.rel = 'stylesheet'
@@ -79,7 +124,6 @@ function normalizeImports(content: string, filename: string): string {
     link.dataset.elementPlusCss = 'true'
     document.head.appendChild(link)
   }
-  // Tailwind CSS
   if (!document.querySelector('script[data-tailwind]')) {
     const script = document.createElement('script')
     script.src = 'https://cdn.tailwindcss.com'
@@ -104,12 +148,9 @@ function normalizeImports(content: string, filename: string): string {
     }
   }
 
-  // 移除所有 CSS import（@vue/repl 不支持）
   result = result
     .replace(/^import\s+['"][^'"]+\.css['"]\s*;?\s*$/gm, '')
-    // @/path/to/File.vue → ./File.vue
     .replace(/(['"])@\/(?:[^'"]*\/)?([^/'"]+)\1/g, '$1./$2$1')
-    // ./path/to/File.vue 或 ../path/to/File.vue → ./File.vue
     .replace(/(['"])\.\.?\/(?:[^'"]*\/)?([^/'"]+\.(vue|ts|tsx|js|jsx))\1/g, '$1./$2$1')
 
   return result
@@ -122,7 +163,6 @@ function syncFilesToRepl() {
   const newFiles: Record<string, string> = {}
   for (const f of allFiles) {
     if (!f.content || !SUPPORTED_EXTS.test(f.name)) continue
-    // 扁平化：所有文件放到 src/ 根，key = "src/FileName.vue"
     newFiles[f.name] = normalizeImports(f.content, f.name)
   }
   if (!newFiles['App.vue']) return
@@ -130,28 +170,121 @@ function syncFilesToRepl() {
   replStore.setFiles(newFiles, 'App.vue')
 }
 
+function collectEditableApiFiles(): ApiFile[] {
+  const result: ApiFile[] = []
+
+  function collect(files: ProjectFile[]) {
+    for (const f of files) {
+      if (f.type === 'file' && !f.readonly) {
+        result.push({
+          id: f.id,
+          name: f.name,
+          path: f.path,
+          type: f.type,
+          language: f.language,
+          content: f.content,
+        })
+      }
+      if (f.children) {
+        collect(f.children)
+      }
+    }
+  }
+
+  collect(projectStore.files)
+  return result
+}
+
+async function handleSave() {
+  const sessionId = chatStore.currentSessionId
+  if (!sessionId) {
+    ElMessage.warning('没有活动的会话')
+    return
+  }
+
+  isSaving.value = true
+  try {
+    const filesToSave = collectEditableApiFiles()
+    await updateSessionFiles(sessionId, filesToSave)
+    projectStore.clearModified()
+    chatStore.updateSessionFiles(sessionId, filesToSave)
+    ElMessage.success('保存成功')
+  } catch (error) {
+    console.error('Failed to save files:', error)
+    ElMessage.error('保存失败')
+  } finally {
+    isSaving.value = false
+  }
+}
+
+function handleSelectFile(file: ProjectFile) {
+  projectStore.selectFile(file.id)
+}
+
+function handleAddFile() {
+  projectStore.addFile()
+}
+
+async function handleDeleteFile(file: ProjectFile) {
+  try {
+    await ElMessageBox.confirm(`确定删除文件 "${file.name}" 吗？`, '确认删除', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+    projectStore.deleteFile(file.id)
+    ElMessage.success('文件已删除')
+  } catch {
+    // 用户取消
+  }
+}
+
+function handleRenameFile(file: ProjectFile, newName: string) {
+  projectStore.renameFile(file.id, newName)
+}
+
+function handleContentChange(content: string) {
+  if (selectedFile.value && !selectedFile.value.readonly) {
+    projectStore.updateFileContent(selectedFile.value.id, content)
+  }
+}
+
 const debouncedSync = useDebounceFn(syncFilesToRepl, 300)
 watch(() => projectStore.files, debouncedSync, { deep: true, immediate: true })
 </script>
 
 <style scoped>
-.result-tabs {
+.toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   flex-shrink: 0;
+  border-bottom: 1px solid #e4e7ed;
+  background: #fafafa;
+}
+
+.result-tabs {
+  flex: 1;
 }
 
 .result-tabs :deep(.el-tabs__header) {
   margin: 0;
   padding: 0 16px;
-  background: #fafafa;
-  border-bottom: 1px solid #e4e7ed;
+  border-bottom: none;
+  background: transparent;
 }
 
 .result-tabs :deep(.el-tabs__content) {
   display: none;
 }
 
+.toolbar-actions {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px;
+}
+
 .repl-wrapper {
-  flex: 1;
   overflow: hidden;
 }
 
@@ -170,40 +303,34 @@ watch(() => projectStore.files, debouncedSync, { deep: true, immediate: true })
   display: none !important;
 }
 
-.repl-wrapper.code :deep(.split-pane > .right),
-.repl-wrapper.code :deep(.split-pane > .dragger) {
-  display: none !important;
+.code-editor-wrapper {
+  overflow: hidden;
 }
 
-.repl-wrapper.code :deep(.split-pane > .left) {
-  width: 100% !important;
-  height: 100% !important;
-  display: flex !important;
-  flex-direction: row !important;
+.file-tree-panel {
+  width: 200px;
+  flex-shrink: 0;
+  border-right: 1px solid #e4e7ed;
+  overflow-y: auto;
 }
 
-.repl-wrapper.code :deep(.file-selector) {
+.editor-panel {
   display: flex;
   flex-direction: column;
-  width: 160px;
-  min-width: 160px;
-  height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  border-right: 1px solid #e4e7ed;
-  border-bottom: none;
-  flex-shrink: 0;
-}
-
-.repl-wrapper.code :deep(.file-selector .file) {
-  white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
-.repl-wrapper.code :deep(.editor-container) {
+.editor-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #e4e7ed;
+  font-size: 13px;
+}
+
+.editor-panel :deep(.monaco-editor-container) {
   flex: 1;
-  overflow: hidden;
-  height: 100%;
 }
 </style>

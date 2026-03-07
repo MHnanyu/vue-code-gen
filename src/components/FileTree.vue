@@ -1,91 +1,128 @@
 <template>
   <div class="text-sm">
-    <div class="tree-node" v-for="node in files" :key="node.id">
-      <div
-        class="flex items-center gap-2 p-2 cursor-pointer rounded transition-colors hover:bg-gray-50"
-        :class="[
-          node.id === selectedFileId ? 'bg-blue-50 text-blue-500' : '',
-          node.type === 'folder' ? 'font-medium' : ''
-        ]"
-        :style="{ paddingLeft: `${depth * 16 + 8}px` }"
-        @click="handleClick(node)"
-      >
-        <span class="flex items-center">
-          <template v-if="node.type === 'folder'">
-            <el-icon v-if="isExpanded(node.id)" color="#e6a23c"><FolderOpened /></el-icon>
-            <el-icon v-else color="#e6a23c"><Folder /></el-icon>
-          </template>
-          <template v-else>
-            <el-icon :color="getFileIconColor(node.language || '')"><Document /></el-icon>
-          </template>
-        </span>
-        <span class="flex-1 whitespace-nowrap overflow-hidden text-ellipsis">{{ node.name }}</span>
+    <div class="file-section">
+      <div class="section-header">
+        <span class="font-medium text-gray-700">用户文件</span>
+        <el-button size="small" type="primary" link @click="$emit('add-file')">
+          <el-icon><Plus /></el-icon> 新增
+        </el-button>
       </div>
+      <div v-if="editableFiles.length > 0">
+        <div class="tree-node" v-for="node in editableFiles" :key="node.id">
+          <FileTreeItem
+            :node="node"
+            :depth="0"
+            :selected-file-id="selectedFileId"
+            :default-expanded-ids="editableFolderIds"
+            @select="$emit('select', $event)"
+            @delete="$emit('delete', $event)"
+            @rename="$emit('rename', $event)"
+          />
+        </div>
+      </div>
+      <div v-else class="text-gray-400 text-xs p-2">暂无用户文件</div>
+    </div>
 
-      <div v-if="node.type === 'folder' && node.children && isExpanded(node.id)" class="tree-children">
-        <FileTreeItem
-          :files="node.children"
-          :depth="depth + 1"
-          :selected-file-id="selectedFileId"
-          @select="$emit('select', $event)"
-        />
+    <div class="file-section readonly-section">
+      <div class="section-header">
+        <span class="font-medium text-gray-500">系统文件（只读）</span>
+      </div>
+      <div v-if="readonlyFiles.length > 0">
+        <div class="tree-node" v-for="node in readonlyFiles" :key="node.id">
+          <FileTreeItem
+            :node="node"
+            :depth="0"
+            :selected-file-id="selectedFileId"
+            :is-readonly="true"
+            @select="$emit('select', $event)"
+          />
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
-import { Folder, FolderOpened, Document } from '@element-plus/icons-vue'
+import { computed } from 'vue'
+import { Plus } from '@element-plus/icons-vue'
 import type { ProjectFile } from '@/types'
+import FileTreeItem from './FileTreeItem.vue'
 
-const props = withDefaults(defineProps<{
+const props = defineProps<{
   files: ProjectFile[]
-  depth?: number
   selectedFileId?: string | null
-}>(), {
-  depth: 0
-})
-
-const emit = defineEmits<{
-  select: [file: ProjectFile]
 }>()
 
-const expandedIds = ref<Set<string>>(new Set())
+defineEmits<{
+  select: [file: ProjectFile]
+  'add-file': []
+  delete: [file: ProjectFile]
+  rename: [file: ProjectFile, newName: string]
+}>()
 
-function isExpanded(id: string): boolean {
-  return expandedIds.value.has(id)
-}
+const editableFiles = computed(() => {
+  return filterFiles(props.files, false)
+})
 
-function handleClick(node: ProjectFile) {
-  if (node.type === 'folder') {
-    if (isExpanded(node.id)) {
-      expandedIds.value.delete(node.id)
-    } else {
-      expandedIds.value.add(node.id)
+const readonlyFiles = computed(() => {
+  return filterFiles(props.files, true)
+})
+
+const editableFolderIds = computed(() => {
+  return collectFolderIds(editableFiles.value)
+})
+
+function collectFolderIds(files: ProjectFile[]): string[] {
+  const ids: string[] = []
+  for (const f of files) {
+    if (f.type === 'folder') {
+      ids.push(f.id)
+      if (f.children) {
+        ids.push(...collectFolderIds(f.children))
+      }
     }
-    // 强制更新
-    expandedIds.value = new Set(expandedIds.value)
-  } else {
-    emit('select', node)
   }
+  return ids
 }
 
-function getFileIconColor(language: string): string {
-  const colors: Record<string, string> = {
-    vue: '#42b883',
-    typescript: '#3178c6',
-    javascript: '#f7df1e',
-    html: '#e34c26',
-    css: '#264de4',
-    json: '#cbcb41'
+function filterFiles(fileList: ProjectFile[], readonly: boolean): ProjectFile[] {
+  const result: ProjectFile[] = []
+  
+  for (const f of fileList) {
+    if (f.type === 'file') {
+      if (!!f.readonly === readonly) {
+        result.push(f)
+      }
+    } else if (f.type === 'folder' && f.children) {
+      const filteredChildren = filterFiles(f.children, readonly)
+      if (filteredChildren.length > 0) {
+        result.push({
+          ...f,
+          readonly,
+          children: filteredChildren
+        })
+      }
+    }
   }
-  return colors[language] || '#909399'
+  
+  return result
 }
 </script>
 
-<script lang="ts">
-export default {
-  name: 'FileTreeItem'
+<style scoped>
+.file-section {
+  margin-bottom: 8px;
 }
-</script>
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px 4px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.readonly-section .section-header {
+  background: #fafafa;
+}
+</style>

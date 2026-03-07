@@ -64,6 +64,19 @@ const isResizing = ref(false)
 let startX = 0
 let startWidth = 0
 
+const SYSTEM_FILE_PATHS = new Set([
+  '/src/main.ts',
+  '/src/App.vue',
+  '/src/style.css',
+  '/public/index.html',
+  '/package.json',
+  '/vite.config.ts',
+])
+
+function filterUserFiles(files: any[]) {
+  return files.filter(f => !SYSTEM_FILE_PATHS.has(f.path))
+}
+
 onMounted(async () => {
   await chatStore.loadSessions()
 
@@ -75,8 +88,9 @@ onMounted(async () => {
     const session = chatStore.sessions.find(s => s.id === sessionId)
     if (session && session.files && session.files.length > 0) {
       const { buildProjectFiles } = await import('@/templates/project-template')
-      const mainPageContent = session.files[0]?.content || ''
-      const extraFiles = session.files.slice(1).map((f) => ({
+      const userFiles = filterUserFiles(session.files)
+      const mainPageContent = userFiles[0]?.content || ''
+      const extraFiles = userFiles.slice(1).map((f) => ({
         id: f.id,
         name: f.name,
         path: f.path,
@@ -112,8 +126,9 @@ watch(() => chatStore.currentSessionId, async (id) => {
   
   if (session.files && session.files.length > 0) {
     const { buildProjectFiles } = await import('@/templates/project-template')
-    const mainPageContent = session.files[0]?.content || ''
-    const extraFiles = session.files.slice(1).map((f) => ({
+    const userFiles = filterUserFiles(session.files)
+    const mainPageContent = userFiles[0]?.content || ''
+    const extraFiles = userFiles.slice(1).map((f) => ({
       id: f.id,
       name: f.name,
       path: f.path,
