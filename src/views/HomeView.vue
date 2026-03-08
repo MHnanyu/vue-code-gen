@@ -68,7 +68,7 @@ async function handleGenerate() {
 
     const sessionId = await chatStore.createSessionRemote(prompt.value.slice(0, 30))
     if (sessionId) {
-      router.push({ path: '/chat', query: { session_id: sessionId } })
+      router.push({ path: '/workspace', query: { session_id: sessionId } })
     }
   } finally {
     loading.value = false

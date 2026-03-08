@@ -45,8 +45,7 @@ src/
 └── views/            # 页面视图
     ├── HomeView.vue        # 首页（需求输入）
     ├── ChatView.vue        # AI 对话页
-    ├── PreviewView.vue     # HTML 预览页
-    └── GeneratorView.vue   # 代码生成页
+    └── PreviewView.vue     # HTML 预览页
 ```
 
 ## 快速开始
@@ -81,9 +80,9 @@ python -m uvicorn app.main:app --reload --port 8000
 ```
 首页 (/)          输入需求描述
     ↓
-对话页 (/chat)    AI 对话生成代码，实时预览
+工作台 (/workspace)    AI 对话生成代码，实时预览
     ↓
-预览页            独立预览生成的页面
+演练场 (/playground)  在线编辑 HTML/CSS/JS
 ```
 
 ## 相关项目

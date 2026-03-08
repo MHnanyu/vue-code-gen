@@ -9,30 +9,16 @@
       <router-link 
         class="text-gray-500 font-medium py-2 border-b-2 border-transparent transition-all hover:text-primary"
         active-class="text-primary border-primary"
-        to="/chat"
+        to="/workspace"
       >
-        Chat
+        工作台
       </router-link>
       <router-link 
         class="text-gray-500 font-medium py-2 border-b-2 border-transparent transition-all hover:text-primary"
         active-class="text-primary border-primary"
-        to="/generator"
+        to="/playground"
       >
-        Code Gen
-      </router-link>
-      <router-link 
-        class="text-gray-500 font-medium py-2 border-b-2 border-transparent transition-all hover:text-primary"
-        active-class="text-primary border-primary"
-        to="/preview"
-      >
-        Preview
-      </router-link>
-      <router-link 
-        class="text-gray-500 font-medium py-2 border-b-2 border-transparent transition-all hover:text-primary"
-        active-class="text-primary border-primary"
-        to="/ux-design"
-      >
-        UX Design
+        演练场
       </router-link>
     </nav>
   </header>

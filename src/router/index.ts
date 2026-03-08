@@ -10,28 +10,16 @@ const router = createRouter({
       meta: { title: '首页' }
     },
     {
-      path: '/chat',
-      name: 'chat',
+      path: '/workspace',
+      name: 'workspace',
       component: () => import('@/views/ChatView.vue'),
-      meta: { title: 'AI对话' }
+      meta: { title: '工作台' }
     },
     {
-      path: '/generator',
-      name: 'generator',
-      component: () => import('@/views/GeneratorView.vue'),
-      meta: { title: '代码生成' }
-    },
-    {
-      path: '/preview',
-      name: 'preview',
+      path: '/playground',
+      name: 'playground',
       component: () => import('@/views/PreviewView.vue'),
-      meta: { title: 'HTML预览' }
-    },
-    {
-      path: '/ux-design',
-      name: 'ux-design',
-      component: () => import('@/views/UxDesignView.vue'),
-      meta: { title: 'UX设计' }
+      meta: { title: '演练场' }
     }
   ]
 })

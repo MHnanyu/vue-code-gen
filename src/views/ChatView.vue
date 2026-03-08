@@ -105,11 +105,19 @@ onMounted(async () => {
     } else {
       projectStore.clearProject()
     }
+  } else if (chatStore.currentSessionId) {
+    router.replace({ path: '/workspace', query: { session_id: chatStore.currentSessionId } })
   } else {
     projectStore.clearProject()
   }
   
   isReady.value = true
+})
+
+watch(() => route.query.session_id, (sessionId) => {
+  if (!sessionId && chatStore.currentSessionId) {
+    router.replace({ path: '/workspace', query: { session_id: chatStore.currentSessionId } })
+  }
 })
 
 watch(() => chatStore.currentSessionId, async (id) => {
@@ -119,7 +127,7 @@ watch(() => chatStore.currentSessionId, async (id) => {
   }
   
   if (route.query.session_id !== id) {
-    router.replace({ path: '/chat', query: { session_id: id } })
+    router.replace({ path: '/workspace', query: { session_id: id } })
   }
   
   const session = chatStore.sessions.find(s => s.id === id)
@@ -155,7 +163,7 @@ onUnmounted(() => {
 function handleNewChat() {
   chatStore.currentSessionId = null
   projectStore.clearProject()
-  router.push({ path: '/chat' })
+  router.push({ path: '/workspace' })
 }
 
 function toggleHistory() {
