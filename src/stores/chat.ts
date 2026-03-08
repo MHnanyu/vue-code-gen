@@ -6,6 +6,7 @@ import {
   getSessions as apiGetSessions,
   getSession as apiGetSession,
   deleteSession as apiDeleteSession,
+  updateSessionTitle as apiUpdateSessionTitle,
   transformApiSession,
 } from '@/api'
 
@@ -72,6 +73,18 @@ export const useChatStore = defineStore('chat', () => {
       }
     } catch (error) {
       console.error('Failed to delete session:', error)
+    }
+  }
+
+  async function updateSessionTitleRemote(id: string, title: string) {
+    try {
+      await apiUpdateSessionTitle(id, title)
+      const session = sessions.value.find(s => s.id === id)
+      if (session) {
+        session.title = title.slice(0, 30) + (title.length > 30 ? '...' : '')
+      }
+    } catch (error) {
+      console.error('Failed to update session title:', error)
     }
   }
 
@@ -145,6 +158,7 @@ export const useChatStore = defineStore('chat', () => {
     addMessageLocal,
     deleteSession,
     deleteSessionRemote,
+    updateSessionTitleRemote,
     loadSessions,
     loadSession,
     setLoading,

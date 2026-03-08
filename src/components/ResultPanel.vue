@@ -377,7 +377,7 @@ watch(() => projectStore.files, debouncedSync, { deep: true, immediate: true })
   align-items: center;
   flex-shrink: 0;
   border-bottom: 1px solid #e4e7ed;
-  background: #fafafa;
+  background: #fff;
 }
 
 .result-tabs {
@@ -439,6 +439,10 @@ watch(() => projectStore.files, debouncedSync, { deep: true, immediate: true })
   display: none !important;
 }
 
+.repl-wrapper.preview :deep(.output-container) {
+  height: 100% !important;
+}
+
 .code-editor-wrapper {
   overflow: hidden;
 }
@@ -461,7 +465,7 @@ watch(() => projectStore.files, debouncedSync, { deep: true, immediate: true })
   align-items: center;
   gap: 8px;
   padding: 8px 16px;
-  background: #fafafa;
+  background: #fff;
   border-bottom: 1px solid #e4e7ed;
   font-size: 13px;
 }

@@ -24,7 +24,7 @@
       </div>
 
       <div
-        class="w-px cursor-col-resize transition-colors relative self-stretch my-4 group"
+        class="w-px cursor-col-resize transition-colors relative self-stretch group"
         :class="isResizing ? 'bg-blue-400' : 'bg-gray-200 hover:bg-blue-300'"
         @mousedown="startResize"
       >

@@ -17,20 +17,35 @@
       <div
         v-for="session in sortedSessions"
         :key="session.id"
-        class="flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all mb-1 hover:bg-gray-50"
+        class="group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all mb-1 hover:bg-gray-50"
         :class="session.id === currentSessionId ? 'bg-blue-50' : ''"
         @click="selectSession(session.id)"
+        @dblclick="startEdit(session)"
       >
         <div class="flex items-center gap-3 flex-1 min-w-0">
           <el-icon class="text-gray-400 text-lg"><ChatDotRound /></el-icon>
           <div class="flex-1 min-w-0">
-            <div class="text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis">
-              {{ session.title }}
-            </div>
+            <template v-if="editingSessionId === session.id">
+              <input
+                :ref="el => setInputRef(el as HTMLInputElement)"
+                v-model="editTitle"
+                class="edit-input"
+                @click.stop
+                @blur="handleBlur"
+                @keydown.enter="handleEnter"
+                @keydown.escape="cancelEdit"
+              />
+            </template>
+            <template v-else>
+              <div class="text-sm text-gray-800 whitespace-nowrap overflow-hidden text-ellipsis">
+                {{ session.title }}
+              </div>
+            </template>
             <div class="text-xs text-gray-400 mt-1">{{ formatTime(session.updatedAt) }}</div>
           </div>
         </div>
         <el-button
+          v-if="editingSessionId !== session.id"
           text
           class="opacity-0 transition-opacity group-hover:opacity-100"
           @click.stop="handleDelete(session.id)"
@@ -45,9 +60,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, nextTick } from 'vue'
+import { ElMessageBox } from 'element-plus'
 import { Plus, ChatDotRound, Delete, DArrowLeft } from '@element-plus/icons-vue'
 import { useChatStore } from '@/stores/chat'
+import type { ChatSession } from '@/types'
 
 const emit = defineEmits<{
   newChat: []
@@ -58,6 +75,17 @@ const chatStore = useChatStore()
 
 const sortedSessions = computed(() => chatStore.sortedSessions)
 const currentSessionId = computed(() => chatStore.currentSessionId)
+
+const editingSessionId = ref<string | null>(null)
+const editTitle = ref('')
+const originalTitle = ref('')
+const inputRef = ref<HTMLInputElement | null>(null)
+
+function setInputRef(el: HTMLInputElement | null) {
+  if (el) {
+    inputRef.value = el
+  }
+}
 
 const SYSTEM_FILE_PATHS = new Set([
   '/src/main.ts',
@@ -73,6 +101,9 @@ function filterUserFiles(files: any[]) {
 }
 
 async function selectSession(id: string) {
+  if (editingSessionId.value === id) return
+  if (chatStore.currentSessionId === id) return
+  
   await chatStore.loadSession(id)
   chatStore.selectSession(id)
   
@@ -98,8 +129,58 @@ async function selectSession(id: string) {
   }
 }
 
-function handleDelete(id: string) {
-  chatStore.deleteSessionRemote(id)
+function startEdit(session: ChatSession) {
+  if (chatStore.currentSessionId !== session.id) {
+    selectSession(session.id)
+    return
+  }
+  editingSessionId.value = session.id
+  editTitle.value = session.title
+  originalTitle.value = session.title
+  nextTick(() => {
+    inputRef.value?.focus()
+    inputRef.value?.select()
+  })
+}
+
+async function handleRenameSubmit() {
+  if (!editingSessionId.value) return
+  
+  const newTitle = editTitle.value.trim()
+  
+  if (!newTitle || newTitle === originalTitle.value) {
+    editingSessionId.value = null
+    return
+  }
+  
+  await chatStore.updateSessionTitleRemote(editingSessionId.value, newTitle)
+  editingSessionId.value = null
+}
+
+function handleBlur() {
+  handleRenameSubmit()
+}
+
+function handleEnter() {
+  inputRef.value?.blur()
+}
+
+function cancelEdit() {
+  editingSessionId.value = null
+  editTitle.value = ''
+}
+
+async function handleDelete(id: string) {
+  try {
+    await ElMessageBox.confirm('确定要删除该会话吗？', '删除确认', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+    chatStore.deleteSessionRemote(id)
+  } catch {
+    // 用户取消
+  }
 }
 
 function handleNewChat() {
@@ -124,5 +205,19 @@ function formatTime(date: Date): string {
 <style scoped>
 :deep(.el-empty) {
   padding: 40px 0;
+}
+
+.edit-input {
+  width: 100%;
+  max-width: 160px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid #409eff;
+  border-radius: 4px;
+  outline: none;
+  font-size: 14px;
+  font-family: inherit;
+  line-height: 22px;
+  background: #fff;
 }
 </style>
