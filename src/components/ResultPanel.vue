@@ -119,7 +119,7 @@ const replStore = useStore({
     imports: {
       ...vueImportMap.value.imports,
       'element-plus': 'https://unpkg.com/element-plus@2.4.4/dist/index.full.mjs',
-      '@element-plus/icons-vue': 'https://unpkg.com/@element-plus/icons-vue@2.3.1/dist/index.esm.js',
+      '@element-plus/icons-vue': 'https://unpkg.com/@element-plus/icons-vue@2.3.1/dist/index.js',
     },
   })),
 })

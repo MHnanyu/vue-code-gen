@@ -75,6 +75,7 @@ import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useGeneratorStore } from '@/stores/generator'
 import MonacoEditor from '@/components/MonacoEditor.vue'
+import { compileVueSFC } from '@/preview/compiler'
 
 const route = useRoute()
 const store = useGeneratorStore()
@@ -93,14 +94,67 @@ const currentLib = computed(() => (route.query.lib as string) || 'ElementUI')
 
 const previewHtml = computed(() => {
   if (!store.currentFile?.content) return ''
+  
+  const content = store.currentFile.content
+  let template = ''
+  let script = ''
+  let style = ''
+  
+  if (store.currentFile.language === 'vue') {
+    try {
+      const compiled = compileVueSFC(content)
+      template = compiled.descriptor.template?.content || ''
+      script = compiled.script || ''
+      style = compiled.styles.map(s => s.code).join('\n')
+    } catch (e) {
+      return `<!DOCTYPE html><html><body><pre style="color:red;padding:20px;">${e}</pre></body></html>`
+    }
+  } else {
+    template = content
+  }
+  
   return `<!DOCTYPE html>
-<html>
-<head><meta charset="UTF-8"></head>
-<body style="margin:0;padding:20px;font-family:sans-serif;background:#f5f5f5;">
-  <div style="background:white;padding:20px;border-radius:8px;text-align:center;color:#666;">
-    <p>组件预览区域</p>
-    <small>完整预览需要运行时环境</small>
-  </div>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"><\/script>
+  <script src="https://unpkg.com/element-plus"><\/script>
+  <script src="https://unpkg.com/@element-plus/icons-vue/dist/index.iife.min.js"><\/script>
+  <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
+    ${style}
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+  <script>
+    const { createApp, ref, reactive, computed, watch, onMounted, onUnmounted } = Vue;
+    const { ElMessage, ElMessageBox } = ElementPlus;
+    const Icons = window.ElementPlusIconsVue || {};
+    
+    try {
+      const app = createApp({
+        setup() {
+          ${script.replace(/^import\s+.*from\s+['"][^'"]+['"];?\s*$/gm, '')}
+        },
+        template: \`${template.replace(/`/g, '\\`').replace(/\$/g, '\\$')}\`
+      });
+      
+      Object.keys(Icons).forEach(key => {
+        app.component(key, Icons[key]);
+      });
+      
+      app.use(ElementPlus);
+      app.mount('#app');
+    } catch (e) {
+      console.error('Vue app error:', e);
+      document.getElementById('app').innerHTML = '<pre style="color:red;padding:20px;white-space:pre-wrap;">' + (e.stack || e.message) + '</pre>';
+    }
+  <\/script>
 </body>
 </html>`
 })

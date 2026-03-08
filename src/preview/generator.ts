@@ -346,9 +346,9 @@ export function generatePreviewHtml(
     </div>
   </div>
 
-  <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"></script>
-  <script src="https://unpkg.com/element-plus@2.9.1/dist/index.full.min.js"></script>
-  <script src="https://unpkg.com/@element-plus/icons-vue@2.3.2/dist/index.iife.min.js"></script>
+  <script src="https://unpkg.com/vue@3.5.13/dist/vue.global.prod.js"><\/script>
+  <script src="https://unpkg.com/element-plus@2.9.1/dist/index.full.min.js"><\/script>
+  <script src="https://unpkg.com/@element-plus/icons-vue@2.3.2/dist/index.iife.min.js"><\/script>
 
   <script>
     window.onerror = function(msg, url, line, col, error) {

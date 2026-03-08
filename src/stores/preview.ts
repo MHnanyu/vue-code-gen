@@ -36,7 +36,11 @@ export const usePreviewStore = defineStore('preview', () => {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"><\/script>
+  <script src="https://unpkg.com/element-plus"><\/script>
+  <script src="https://unpkg.com/@element-plus/icons-vue/dist/index.iife.min.js"><\/script>
   <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css">
+  <script src="https://cdn.tailwindcss.com"><\/script>
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
@@ -44,14 +48,31 @@ export const usePreviewStore = defineStore('preview', () => {
   </style>
 </head>
 <body>
-  ${html.value}
+  <div id="app"></div>
   <script>
+    const { createApp, ref, reactive, computed, watch, onMounted, onUnmounted } = Vue;
+    const { ElMessage, ElMessageBox } = ElementPlus;
+    const Icons = window.ElementPlusIconsVue || {};
+    
     try {
-      ${javascript.value}
+      const app = createApp({
+        setup() {
+          ${javascript.value}
+        },
+        template: \`${html.value}\`
+      });
+      
+      Object.keys(Icons).forEach(key => {
+        app.component(key, Icons[key]);
+      });
+      
+      app.use(ElementPlus);
+      app.mount('#app');
     } catch (e) {
-      console.error(e.message);
+      console.error('Vue app error:', e);
+      document.getElementById('app').innerHTML = '<pre style="color:red;padding:20px;white-space:pre-wrap;">' + (e.stack || e.message) + '</pre>';
     }
-  \x3C/script>
+  <\/script>
 </body>
 </html>`)
 
