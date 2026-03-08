@@ -44,7 +44,33 @@
             <div class="text-xs text-gray-400 mt-1">{{ formatTime(message.timestamp) }}</div>
           </div>
         </div>
+        <div v-if="isLoading" class="flex gap-3 mb-5">
+          <div class="flex-shrink-0">
+            <el-avatar :size="32" style="background: #67c23a">AI</el-avatar>
+          </div>
+          <div class="px-4 py-3 rounded-xl bg-gray-100">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <span class="ml-2 text-gray-500">正在生成...</span>
+          </div>
+        </div>
       </template>
+      <div v-else-if="isLoading && pendingUserMessage" class="flex flex-col gap-5">
+        <div class="flex gap-3 flex-row-reverse">
+          <div class="flex-shrink-0">
+            <el-avatar :size="32" style="background: #409eff">U</el-avatar>
+          </div>
+          <div class="px-4 py-3 rounded-xl bg-blue-500 text-white">{{ pendingUserMessage }}</div>
+        </div>
+        <div class="flex gap-3">
+          <div class="flex-shrink-0">
+            <el-avatar :size="32" style="background: #67c23a">AI</el-avatar>
+          </div>
+          <div class="px-4 py-3 rounded-xl bg-gray-100">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <span class="ml-2 text-gray-500">正在生成...</span>
+          </div>
+        </div>
+      </div>
       <el-empty v-else description="开始新的对话吧" :image-size="80">
         <template #image>
           <span class="text-5xl">💬</span>
@@ -73,7 +99,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
-import { DArrowRight } from '@element-plus/icons-vue'
+import { DArrowRight, Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useChatStore } from '@/stores/chat'
 import { useProjectStore } from '@/stores/project'
@@ -95,6 +121,7 @@ const projectStore = useProjectStore()
 
 const inputMessage = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
+const pendingUserMessage = ref('')
 
 const currentSession = computed(() => chatStore.currentSession)
 const isLoading = computed(() => chatStore.isLoading)
@@ -133,10 +160,13 @@ async function sendMessage() {
   let sessionId = chatStore.currentSessionId
   if (!sessionId) {
     sessionId = await chatStore.createSessionRemote(message)
-    if (!sessionId) return
+    if (!sessionId) {
+      return
+    }
   }
 
   chatStore.addMessageLocal(sessionId, { role: 'user', content: message })
+  pendingUserMessage.value = message
   scrollToBottom()
   chatStore.setLoading(true)
 
@@ -178,6 +208,7 @@ async function sendMessage() {
     ElMessage.error('生成失败: ' + (error as Error).message)
   } finally {
     chatStore.setLoading(false)
+    pendingUserMessage.value = ''
     scrollToBottom()
     emit('generated')
   }

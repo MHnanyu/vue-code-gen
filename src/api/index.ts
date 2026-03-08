@@ -142,6 +142,13 @@ export function transformApiFiles(files: ApiFile[]): ProjectFile[] {
   }))
 }
 
+function parseDate(dateStr: string): Date {
+  if (dateStr.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(dateStr)) {
+    return new Date(dateStr)
+  }
+  return new Date(dateStr + 'Z')
+}
+
 export function transformApiSession(session: ApiSession) {
   return {
     id: session.id,
@@ -150,11 +157,11 @@ export function transformApiSession(session: ApiSession) {
       id: msg.id,
       role: msg.role,
       content: msg.content,
-      timestamp: new Date(msg.timestamp),
+      timestamp: parseDate(msg.timestamp),
     })),
     files: session.files,
-    createdAt: new Date(session.createdAt),
-    updatedAt: new Date(session.updatedAt),
+    createdAt: parseDate(session.createdAt),
+    updatedAt: parseDate(session.updatedAt),
   }
 }
 

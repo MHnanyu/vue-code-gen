@@ -1,5 +1,6 @@
 <template>
   <div
+    v-if="isReady"
     class="flex h-[calc(100vh-60px)] bg-gray-100 p-3 gap-3"
     :class="isResizing ? 'select-none' : ''"
   >
@@ -61,6 +62,7 @@ const chatPanelRef = ref<InstanceType<typeof ChatPanel> | null>(null)
 const isHistoryCollapsed = ref(false)
 const chatPanelWidth = ref(450)
 const isResizing = ref(false)
+const isReady = ref(false)
 let startX = 0
 let startWidth = 0
 
@@ -82,8 +84,8 @@ onMounted(async () => {
 
   const sessionId = route.query.session_id as string
   if (sessionId) {
-    await chatStore.loadSession(sessionId)
     chatStore.selectSession(sessionId)
+    await chatStore.loadSession(sessionId)
     
     const session = chatStore.sessions.find(s => s.id === sessionId)
     if (session && session.files && session.files.length > 0) {
@@ -106,6 +108,8 @@ onMounted(async () => {
   } else {
     projectStore.clearProject()
   }
+  
+  isReady.value = true
 })
 
 watch(() => chatStore.currentSessionId, async (id) => {
