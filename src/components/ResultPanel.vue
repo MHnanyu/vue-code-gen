@@ -14,6 +14,14 @@
           <el-tab-pane label="Code" name="code" />
         </el-tabs>
         <div class="toolbar-actions">
+          <el-tooltip content="全屏预览" placement="top">
+            <el-button
+              :disabled="!hasFiles"
+              @click="goToFullscreenPreview"
+            >
+              <el-icon><FullScreen /></el-icon>
+            </el-button>
+          </el-tooltip>
           <el-button
             type="success"
             :loading="isSaving"
@@ -24,8 +32,8 @@
           </el-button>
           <el-button
             type="primary"
-            :disabled="!isReplReady || activeTab !== 'preview'"
-            @click="exportStaticHtml"
+            :disabled="!replPreviewRef?.isReplReady || activeTab !== 'preview'"
+            @click="replPreviewRef?.exportStaticHtml()"
           >
             导出 HTML
           </el-button>
@@ -39,23 +47,16 @@
         </div>
       </div>
       
-      <div v-if="activeTab === 'preview'" class="repl-wrapper preview flex-1">
-        <div v-if="!isReplReady" class="preview-loading">
-          <el-icon class="is-loading"><Loading /></el-icon>
-          <span>加载预览中...</span>
-        </div>
-        <Repl
-          v-show="isReplReady"
-          :store="replStore"
-          :editor="Monaco"
-          :preview-options="previewOptions"
-          :show-compile-output="false"
-          :show-import-map="false"
-          :show-ts-config="false"
-          :clear-console="false"
-          layout="vertical"
-        />
-      </div>
+      <VueReplPreview
+        v-if="activeTab === 'preview'"
+        ref="replPreviewRef"
+        class="flex-1"
+        :files="projectStore.files"
+        :show-toolbar="false"
+        empty-text="生成代码后显示预览"
+        empty-icon="🎨"
+        loading-text="加载预览中..."
+      />
       
       <div v-else class="code-editor-wrapper flex-1 flex">
         <div class="file-tree-panel">
@@ -88,12 +89,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Loading } from '@element-plus/icons-vue'
-import { useDebounceFn } from '@vueuse/core'
-import { Repl, useStore, useVueImportMap } from '@vue/repl'
-import Monaco from '@vue/repl/monaco-editor'
+import { FullScreen } from '@element-plus/icons-vue'
 import { useProjectStore } from '@/stores/project'
 import { useChatStore } from '@/stores/chat'
 import { updateSessionFiles, type ApiFile } from '@/api'
@@ -101,101 +100,18 @@ import { collectAllFiles } from '@/preview/resolver'
 import { getBaseProjectFiles } from '@/templates/project-template'
 import FileTree from '@/components/FileTree.vue'
 import MonacoEditor from '@/components/MonacoEditor.vue'
+import VueReplPreview from '@/components/VueReplPreview.vue'
 import type { ProjectFile } from '@/types'
 import JSZip from 'jszip'
 
+const router = useRouter()
 const projectStore = useProjectStore()
 const chatStore = useChatStore()
 const activeTab = ref('preview')
 const isSaving = ref(false)
-const isReplReady = ref(false)
+const replPreviewRef = ref<InstanceType<typeof VueReplPreview> | null>(null)
 const hasFiles = computed(() => projectStore.files.length > 0)
 const selectedFile = computed(() => projectStore.selectedFile)
-
-const { importMap: vueImportMap } = useVueImportMap()
-
-const replStore = useStore({
-  builtinImportMap: computed(() => ({
-    imports: {
-      ...vueImportMap.value.imports,
-      'element-plus': 'https://unpkg.com/element-plus@2.4.4/dist/index.full.mjs',
-      '@element-plus/icons-vue': 'https://unpkg.com/@element-plus/icons-vue@2.3.1/dist/index.js',
-    },
-  })),
-})
-
-const previewOptions = {
-  headHTML: `
-    <link rel="stylesheet" href="https://unpkg.com/element-plus@2.4.4/dist/index.css">
-    <script src="https://cdn.tailwindcss.com"><\/script>
-    <style>
-      blockquote {
-        border-left: 4px solid #e5e7eb;
-        padding-left: 1rem;
-        margin: 1rem 0;
-        color: #6b7280;
-      }
-    </style>
-  `
-}
-
-const SUPPORTED_EXTS = /\.(vue|ts|tsx|js|jsx)$/
-
-function normalizeImports(content: string, filename: string): string {
-  let result = content
-
-  if (filename === 'App.vue') {
-    const scriptMatch = result.match(/(<script\s+setup[^>]*>)([\s\S]*?)(<\/script>)/)
-    if (scriptMatch && !scriptMatch[2].includes('element-plus')) {
-      const needsVueImports = []
-      if (!scriptMatch[2].includes('getCurrentInstance')) needsVueImports.push('getCurrentInstance')
-      
-      const vueImport = needsVueImports.length > 0 
-        ? `import { ${needsVueImports.join(', ')} } from 'vue'\n` 
-        : ''
-      
-      const newScript = scriptMatch[1] + 
-        `\n${vueImport}import ElementPlus from 'element-plus'\n` +
-        `const instance = getCurrentInstance()\n` +
-        `const app = instance?.appContext.app\n` +
-        `if (app && !app._elementPlusRegistered) {\n` +
-        `  app.use(ElementPlus)\n` +
-        `  app._elementPlusRegistered = true\n` +
-        `}\n` +
-        scriptMatch[2] + 
-        scriptMatch[3]
-      result = result.replace(scriptMatch[0], newScript)
-    }
-  }
-
-  result = result
-    .replace(/^import\s+['"][^'"]+\.css['"]\s*;?\s*$/gm, '')
-    .replace(/(['"])@\/(?:[^'"]*\/)?([^/'"]+)\1/g, '$1./$2$1')
-    .replace(/(['"])\.\.?\/(?:[^'"]*\/)?([^/'"]+\.(vue|ts|tsx|js|jsx))\1/g, '$1./$2$1')
-
-  return result
-}
-
-function syncFilesToRepl() {
-  const allFiles = collectAllFiles(projectStore.files)
-  if (allFiles.length === 0) {
-    isReplReady.value = false
-    return
-  }
-
-  const newFiles: Record<string, string> = {}
-  for (const f of allFiles) {
-    if (!f.content || !SUPPORTED_EXTS.test(f.name)) continue
-    newFiles[f.name] = normalizeImports(f.content, f.name)
-  }
-  if (!newFiles['App.vue']) {
-    isReplReady.value = false
-    return
-  }
-
-  replStore.setFiles(newFiles, 'App.vue')
-  isReplReady.value = true
-}
 
 function collectEditableApiFiles(): ApiFile[] {
   const result: ApiFile[] = []
@@ -244,6 +160,13 @@ async function handleSave() {
   }
 }
 
+function goToFullscreenPreview() {
+  const sessionId = chatStore.currentSessionId
+  if (sessionId) {
+    router.push({ path: '/preview', query: { sessionId } })
+  }
+}
+
 function handleSelectFile(file: ProjectFile) {
   projectStore.selectFile(file.id)
 }
@@ -273,41 +196,6 @@ function handleRenameFile(file: ProjectFile, newName: string) {
 function handleContentChange(content: string) {
   if (selectedFile.value && !selectedFile.value.readonly) {
     projectStore.updateFileContent(selectedFile.value.id, content)
-  }
-}
-
-function exportStaticHtml() {
-  const replWrapper = document.querySelector('.repl-wrapper.preview')
-  if (!replWrapper) {
-    ElMessage.warning('预览区域未找到')
-    return
-  }
-  
-  const iframe = replWrapper.querySelector('iframe') as HTMLIFrameElement
-  if (!iframe) {
-    ElMessage.warning('预览 iframe 未找到')
-    return
-  }
-
-  try {
-    const innerDoc = iframe.contentDocument || iframe.contentWindow?.document
-    if (!innerDoc) {
-      ElMessage.warning('无法访问预览内容')
-      return
-    }
-
-    const htmlContent = innerDoc.documentElement.outerHTML
-    const blob = new Blob([htmlContent], { type: 'text/html' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'exported-page.html'
-    a.click()
-    URL.revokeObjectURL(url)
-    ElMessage.success('导出成功')
-  } catch (error) {
-    console.error('Export failed:', error)
-    ElMessage.error('导出失败，可能是跨域限制')
   }
 }
 
@@ -365,9 +253,6 @@ async function exportProject() {
     ElMessage.error('导出项目失败')
   }
 }
-
-const debouncedSync = useDebounceFn(syncFilesToRepl, 300)
-watch(() => projectStore.files, debouncedSync, { deep: true, immediate: true })
 </script>
 
 <style scoped>

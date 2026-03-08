@@ -16,6 +16,12 @@ const router = createRouter({
       meta: { title: '工作台' }
     },
     {
+      path: '/preview',
+      name: 'preview',
+      component: () => import('@/views/SessionPreviewView.vue'),
+      meta: { title: '全屏预览' }
+    },
+    {
       path: '/playground',
       name: 'playground',
       component: () => import('@/views/PreviewView.vue'),
