@@ -138,10 +138,31 @@ function normalizeImports(content: string, filename: string): string {
 }
 
 function generateAppVue(newFiles: Record<string, string>): string | null {
-  const firstVueFile = Object.keys(newFiles).find(name => name.endsWith('.vue'))
+  const firstVueFile = Object.keys(newFiles).find(name => 
+    name.endsWith('.vue') && 
+    name !== 'App.vue' && 
+    !name.startsWith('ccui/')
+  )
   if (!firstVueFile) return null
   
   const componentName = firstVueFile.replace('.vue', '')
+  
+  const ccuiFiles = Object.keys(newFiles).filter(name => name.startsWith('ccui/') && name.endsWith('.vue'))
+  const hasCcui = ccuiFiles.length > 0
+  
+  let ccuiImports = ''
+  let ccuiRegisters = ''
+  
+  if (hasCcui) {
+    const componentNames = ccuiFiles.map(f => {
+      const baseName = f.replace('ccui/', '').replace('.vue', '')
+      return { importName: `Cc${baseName}`, fileName: f, tagName: `Cc${baseName}` }
+    })
+    
+    ccuiImports = componentNames.map(c => `import ${c.importName} from './${c.fileName}'`).join('\n') + '\n'
+    ccuiRegisters = '\n' + componentNames.map(c => `app.component('${c.tagName}', ${c.importName})`).join('\n')
+  }
+  
   return `<template>
   <${componentName} />
 </template>
@@ -150,11 +171,14 @@ function generateAppVue(newFiles: Record<string, string>): string | null {
 import { getCurrentInstance } from 'vue'
 import ${componentName} from './${firstVueFile}'
 import ElementPlus from 'element-plus'
+${ccuiImports}
 const instance = getCurrentInstance()
 const app = instance?.appContext.app
-if (app && !app._elementPlusRegistered) {
-  app.use(ElementPlus)
-  app._elementPlusRegistered = true
+if (app) {
+  if (!app._elementPlusRegistered) {
+    app.use(ElementPlus)
+    app._elementPlusRegistered = true
+  }${ccuiRegisters}
 }
 <\/script>
 `
@@ -170,17 +194,17 @@ function syncFilesToRepl() {
   const newFiles: Record<string, string> = {}
   for (const f of allFiles) {
     if (!f.content || !SUPPORTED_EXTS.test(f.name)) continue
-    newFiles[f.name] = normalizeImports(f.content, f.name)
+    const fileKey = f.path.startsWith('/src/') ? f.path.slice(5) : f.path.slice(1)
+    newFiles[fileKey] = normalizeImports(f.content, f.name)
   }
 
-  if (!newFiles['App.vue']) {
-    const appVueContent = generateAppVue(newFiles)
-    if (!appVueContent) {
-      isReplReady.value = false
-      return
-    }
-    newFiles['App.vue'] = appVueContent
+  delete newFiles['App.vue']
+  const appVueContent = generateAppVue(newFiles)
+  if (!appVueContent) {
+    isReplReady.value = false
+    return
   }
+  newFiles['App.vue'] = appVueContent
 
   replStore.setFiles(newFiles, 'App.vue')
   isReplReady.value = true

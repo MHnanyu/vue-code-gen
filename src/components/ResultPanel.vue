@@ -14,8 +14,13 @@
           <el-tab-pane label="Code" name="code" />
         </el-tabs>
         <div class="toolbar-actions">
+          <div class="tech-tags">
+            <el-tag type="success" effect="plain" size="small">Vue3</el-tag>
+            <el-tag effect="plain" size="small">{{ componentLibLabel }}</el-tag>
+          </div>
           <el-tooltip content="全屏预览" placement="top">
             <el-button
+              size="small"
               :disabled="!hasFiles"
               @click="goToFullscreenPreview"
             >
@@ -23,6 +28,7 @@
             </el-button>
           </el-tooltip>
           <el-button
+            size="small"
             type="success"
             :loading="isSaving"
             :disabled="!projectStore.isModified"
@@ -31,6 +37,7 @@
             保存并同步
           </el-button>
           <el-button
+            size="small"
             type="primary"
             :disabled="!replPreviewRef?.isReplReady || activeTab !== 'preview'"
             @click="replPreviewRef?.exportStaticHtml()"
@@ -38,6 +45,7 @@
             导出 HTML
           </el-button>
           <el-button
+            size="small"
             type="warning"
             :disabled="!hasFiles"
             @click="exportProject"
@@ -101,8 +109,14 @@ import { getBaseProjectFiles } from '@/templates/project-template'
 import FileTree from '@/components/FileTree.vue'
 import MonacoEditor from '@/components/MonacoEditor.vue'
 import VueReplPreview from '@/components/VueReplPreview.vue'
-import type { ProjectFile } from '@/types'
+import type { ProjectFile, ComponentLib } from '@/types'
 import JSZip from 'jszip'
+
+const COMPONENT_LIB_LABELS: Record<ComponentLib, string> = {
+  ElementUI: 'ElementUI',
+  aui: 'AUI',
+  ccui: 'CcUI',
+}
 
 const router = useRouter()
 const projectStore = useProjectStore()
@@ -112,6 +126,12 @@ const isSaving = ref(false)
 const replPreviewRef = ref<InstanceType<typeof VueReplPreview> | null>(null)
 const hasFiles = computed(() => projectStore.files.length > 0)
 const selectedFile = computed(() => projectStore.selectedFile)
+
+const componentLibLabel = computed(() => {
+  const session = chatStore.currentSession
+  const lib = session?.componentLib || 'ElementUI'
+  return COMPONENT_LIB_LABELS[lib] || 'ElementUI'
+})
 
 function collectEditableApiFiles(): ApiFile[] {
   const result: ApiFile[] = []
@@ -282,8 +302,17 @@ async function exportProject() {
 
 .toolbar-actions {
   display: flex;
-  gap: 8px;
-  padding: 0 16px;
+  gap: 4px;
+  padding: 0 12px;
+  align-items: center;
+}
+
+.tech-tags {
+  display: flex;
+  gap: 6px;
+  margin-right: 6px;
+  padding-right: 10px;
+  border-right: 1px solid #e4e7ed;
 }
 
 .repl-wrapper {

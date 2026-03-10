@@ -100,7 +100,7 @@ onMounted(async () => {
         language: f.language as any,
         content: f.content,
       }))
-      const projectFiles = buildProjectFiles(mainPageContent, extraFiles)
+      const projectFiles = buildProjectFiles(mainPageContent, extraFiles, session.componentLib)
       projectStore.setFiles(projectFiles)
     } else {
       projectStore.clearProject()
@@ -148,7 +148,7 @@ watch(() => chatStore.currentSessionId, async (id) => {
       language: f.language as any,
       content: f.content,
     }))
-    const projectFiles = buildProjectFiles(mainPageContent, extraFiles)
+    const projectFiles = buildProjectFiles(mainPageContent, extraFiles, session.componentLib)
     projectStore.setFiles(projectFiles)
   } else {
     projectStore.clearProject()

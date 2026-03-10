@@ -1,4 +1,4 @@
-import type { ProjectFile } from '@/types'
+import type { ProjectFile, ComponentLib } from '@/types'
 
 const API_BASE = 'http://localhost:8000'
 
@@ -26,6 +26,7 @@ interface ApiSession {
   title: string
   messages?: ApiMessage[]
   files?: ApiFile[]
+  componentLib?: ComponentLib
   createdAt: string
   updatedAt: string
 }
@@ -39,6 +40,7 @@ interface ApiMessage {
 
 interface CreateSessionRequest {
   title?: string
+  componentLib?: ComponentLib
 }
 
 interface AddMessageRequest {
@@ -124,10 +126,10 @@ export async function generateIterate(req: GenerateIterateRequest): Promise<Gene
   })
 }
 
-export async function createSession(title?: string): Promise<ApiSession> {
+export async function createSession(title?: string, componentLib?: ComponentLib): Promise<ApiSession> {
   return request<ApiSession>('/api/sessions', {
     method: 'POST',
-    body: JSON.stringify({ title } as CreateSessionRequest),
+    body: JSON.stringify({ title, componentLib } as CreateSessionRequest),
   })
 }
 
@@ -189,6 +191,7 @@ export function transformApiSession(session: ApiSession) {
       timestamp: parseDate(msg.timestamp),
     })),
     files: session.files,
+    componentLib: session.componentLib,
     createdAt: parseDate(session.createdAt),
     updatedAt: parseDate(session.updatedAt),
   }

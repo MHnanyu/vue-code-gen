@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { ChatMessage, ChatSession } from '@/types'
+import type { ChatMessage, ChatSession, ComponentLib } from '@/types'
 import {
   createSession as apiCreateSession,
   getSessions as apiGetSessions,
@@ -24,9 +24,9 @@ export const useChatStore = defineStore('chat', () => {
     [...sessions.value].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
   )
 
-  async function createSessionRemote(title: string): Promise<string | null> {
+  async function createSessionRemote(title: string, componentLib?: ComponentLib): Promise<string | null> {
     try {
-      const apiSession = await apiCreateSession(title)
+      const apiSession = await apiCreateSession(title, componentLib)
       const session = transformApiSession(apiSession)
       sessions.value.unshift(session)
       currentSessionId.value = session.id

@@ -25,6 +25,7 @@
             <el-select v-model="selectedLib" style="width: 140px">
               <el-option label="ElementUI" value="ElementUI" />
               <el-option label="AUI" value="aui" />
+              <el-option label="CcUI" value="ccui" />
             </el-select>
           </div>
 
@@ -47,12 +48,13 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGeneratorStore } from '@/stores/generator'
 import { useChatStore } from '@/stores/chat'
+import type { ComponentLib } from '@/types'
 
 const router = useRouter()
 const store = useGeneratorStore()
 const chatStore = useChatStore()
 
-const libs = ['ElementUI', 'AUI']
+const libs = ['ElementUI', 'AUI', 'CcUI']
 const prompt = ref('')
 const selectedLib = ref('ElementUI')
 const loading = ref(false)
@@ -66,7 +68,10 @@ async function handleGenerate() {
     store.clearFiles()
     chatStore.setPendingPrompt(prompt.value)
 
-    const sessionId = await chatStore.createSessionRemote(prompt.value.slice(0, 30))
+    const sessionId = await chatStore.createSessionRemote(
+      prompt.value.slice(0, 30),
+      selectedLib.value as ComponentLib
+    )
     if (sessionId) {
       router.push({ path: '/workspace', query: { session_id: sessionId } })
     }

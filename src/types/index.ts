@@ -8,12 +8,15 @@ export interface ChatMessage {
   timestamp: Date
 }
 
+export type ComponentLib = 'ElementUI' | 'aui' | 'ccui'
+
 // 对话会话类型
 export interface ChatSession {
   id: string
   title: string
   messages: ChatMessage[]
   files?: ApiFile[]
+  componentLib?: ComponentLib
   createdAt: Date
   updatedAt: Date
 }

@@ -121,7 +121,7 @@ async function selectSession(id: string) {
       language: f.language,
       content: f.content,
     }))
-    const projectFiles = buildProjectFiles(mainPageContent, extraFiles)
+    const projectFiles = buildProjectFiles(mainPageContent, extraFiles, session.componentLib)
     projectStore.setFiles(projectFiles)
   } else {
     const projectStore = await import('@/stores/project').then(m => m.useProjectStore())

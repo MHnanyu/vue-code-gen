@@ -210,7 +210,7 @@ async function sendMessage() {
         language: f.language as ProjectFile['language'],
         content: f.content,
       }))
-      const projectFiles = buildProjectFiles(mainPageContent, extraFiles)
+      const projectFiles = buildProjectFiles(mainPageContent, extraFiles, currentSession.value?.componentLib)
       projectStore.setFiles(projectFiles)
       chatStore.updateSessionFiles(sessionId!, userFiles)
       chatStore.addMessageLocal(sessionId!, { role: 'assistant', content: msg })
