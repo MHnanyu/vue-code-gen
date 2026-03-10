@@ -8,18 +8,6 @@ interface ApiResponse<T> {
   message?: string
 }
 
-interface GenerateRequest {
-  prompt: string
-  componentLib?: string
-  sessionId?: string
-  files?: ApiFile[]
-}
-
-interface GenerateResponse {
-  files: ApiFile[]
-  message: string
-}
-
 interface ApiFile {
   id: string
   name: string
@@ -88,8 +76,49 @@ export async function checkHealth(): Promise<{ status: string; mongodb: string }
   return request('/health')
 }
 
-export async function generateCode(req: GenerateRequest): Promise<GenerateResponse> {
-  return request('/api/generate', {
+interface GenerateInitialRequest {
+  prompt: string
+  sessionId: string
+  debug?: boolean
+}
+
+interface GenerateIterateRequest {
+  prompt: string
+  sessionId: string
+  files: ApiFile[]
+}
+
+interface StageInfo {
+  status: 'success' | 'skipped' | 'error'
+  duration: number
+  output?: string
+  error?: string
+}
+
+interface GenerateInitialResponse {
+  files: ApiFile[]
+  message: string
+  stages?: {
+    requirement?: StageInfo
+    generation?: StageInfo
+    optimization?: StageInfo
+  }
+}
+
+interface GenerateIterateResponse {
+  files: ApiFile[]
+  message: string
+}
+
+export async function generateInitial(req: GenerateInitialRequest): Promise<GenerateInitialResponse> {
+  return request('/api/generate/initial', {
+    method: 'POST',
+    body: JSON.stringify(req),
+  })
+}
+
+export async function generateIterate(req: GenerateIterateRequest): Promise<GenerateIterateResponse> {
+  return request('/api/generate/iterate', {
     method: 'POST',
     body: JSON.stringify(req),
   })

@@ -103,7 +103,7 @@ import { DArrowRight, Loading } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useChatStore } from '@/stores/chat'
 import { useProjectStore } from '@/stores/project'
-import { generateCode } from '@/api'
+import { generateInitial, generateIterate, type ApiFile } from '@/api'
 import { buildProjectFiles } from '@/templates/project-template'
 import type { ProjectFile } from '@/types'
 
@@ -171,37 +171,50 @@ async function sendMessage() {
   chatStore.setLoading(true)
 
   try {
-    const result = await generateCode({
-      prompt: message,
-      componentLib: 'ElementUI',
-      sessionId,
-      files: currentSession.value?.files,
-    })
+    const hasExistingFiles = currentSession.value?.files && currentSession.value.files.length > 0
+    
+    if (hasExistingFiles) {
+      const result = await generateIterate({
+        prompt: message,
+        sessionId,
+        files: currentSession.value!.files!,
+      })
+      processResult(result.files, result.message)
+    } else {
+      const result = await generateInitial({
+        prompt: message,
+        sessionId,
+        debug: false,
+      })
+      processResult(result.files, result.message)
+    }
 
-    const SYSTEM_FILE_PATHS = new Set([
-      '/src/main.ts',
-      '/src/App.vue',
-      '/src/style.css',
-      '/public/index.html',
-      '/package.json',
-      '/vite.config.ts',
-    ])
+    function processResult(files: ApiFile[], msg: string) {
+      const SYSTEM_FILE_PATHS = new Set([
+        '/src/main.ts',
+        '/src/App.vue',
+        '/src/style.css',
+        '/public/index.html',
+        '/package.json',
+        '/vite.config.ts',
+      ])
 
-    const userFiles = result.files.filter(f => !SYSTEM_FILE_PATHS.has(f.path))
+      const userFiles = files?.filter(f => !SYSTEM_FILE_PATHS.has(f.path)) || []
 
-    const mainPageContent = userFiles[0]?.content || ''
-    const extraFiles: ProjectFile[] = userFiles.slice(1).map((f) => ({
-      id: f.id,
-      name: f.name,
-      path: f.path,
-      type: f.type as 'file',
-      language: f.language as ProjectFile['language'],
-      content: f.content,
-    }))
-    const projectFiles = buildProjectFiles(mainPageContent, extraFiles)
-    projectStore.setFiles(projectFiles)
-    chatStore.updateSessionFiles(sessionId, userFiles)
-    chatStore.addMessageLocal(sessionId, { role: 'assistant', content: result.message })
+      const mainPageContent = userFiles[0]?.content || ''
+      const extraFiles: ProjectFile[] = userFiles.slice(1).map((f) => ({
+        id: f.id,
+        name: f.name,
+        path: f.path,
+        type: f.type as 'file',
+        language: f.language as ProjectFile['language'],
+        content: f.content,
+      }))
+      const projectFiles = buildProjectFiles(mainPageContent, extraFiles)
+      projectStore.setFiles(projectFiles)
+      chatStore.updateSessionFiles(sessionId!, userFiles)
+      chatStore.addMessageLocal(sessionId!, { role: 'assistant', content: msg })
+    }
 
     ElMessage.success('生成成功')
   } catch (error) {
