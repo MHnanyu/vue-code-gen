@@ -1,11 +1,12 @@
 import type { ProjectFile, ComponentLib } from '@/types'
-import { getCcuiComponentsAsProjectFiles } from './ccui-components'
+import { getCcuiComponentsAsProjectFiles, getCcuiThemeAsProjectFiles } from './ccui-components'
 
 export function getMainTs(componentLib: ComponentLib = 'ElementUI'): string {
   if (componentLib === 'ccui') {
     return `import { createApp } from 'vue'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
+import './ccui/theme/tokens.css'
 import './style.css'
 import App from './App.vue'
 
@@ -348,7 +349,12 @@ export function buildProjectFiles(
 
   if (componentLib === 'ccui') {
     const ccuiFiles = getCcuiComponentsAsProjectFiles()
-    srcChildren.push(...ccuiFiles)
+    const ccuiThemeFiles = getCcuiThemeAsProjectFiles()
+    const ccuiFolder = ccuiFiles[0]
+    if (ccuiFolder.children) {
+      ccuiFolder.children.push(...ccuiThemeFiles)
+    }
+    srcChildren.push(ccuiFolder)
   }
 
   const srcFolder: ProjectFile = {
