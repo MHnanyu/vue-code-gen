@@ -69,6 +69,7 @@ import StepsIndex from '../ccui/components/Steps/index.vue?raw'
 import SwitchIndex from '../ccui/components/Switch/index.vue?raw'
 import TabPaneIndex from '../ccui/components/TabPane/index.vue?raw'
 import TableIndex from '../ccui/components/Table/index.vue?raw'
+import TableColumnIndex from '../ccui/components/TableColumn/index.vue?raw'
 import TabsIndex from '../ccui/components/Tabs/index.vue?raw'
 import TagIndex from '../ccui/components/Tag/index.vue?raw'
 import TimePickerIndex from '../ccui/components/TimePicker/index.vue?raw'
@@ -161,6 +162,7 @@ export const CCUI_COMPONENT_FILES: { path: string; name: string; content: string
   { path: 'ccui/Switch.vue', name: 'Switch.vue', content: SwitchIndex },
   { path: 'ccui/TabPane.vue', name: 'TabPane.vue', content: TabPaneIndex },
   { path: 'ccui/Table.vue', name: 'Table.vue', content: TableIndex },
+  { path: 'ccui/TableColumn.vue', name: 'TableColumn.vue', content: TableColumnIndex },
   { path: 'ccui/Tabs.vue', name: 'Tabs.vue', content: TabsIndex },
   { path: 'ccui/Tag.vue', name: 'Tag.vue', content: TagIndex },
   { path: 'ccui/TimePicker.vue', name: 'TimePicker.vue', content: TimePickerIndex },
