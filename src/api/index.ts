@@ -82,6 +82,7 @@ interface GenerateInitialRequest {
   prompt: string
   sessionId: string
   debug?: boolean
+  componentLib?: ComponentLib
 }
 
 interface GenerateIterateRequest {

@@ -185,6 +185,7 @@ async function sendMessage() {
         prompt: message,
         sessionId,
         debug: false,
+        componentLib: currentSession.value?.componentLib,
       })
       processResult(result.files, result.message)
     }
