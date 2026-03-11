@@ -105,7 +105,8 @@ import { useProjectStore } from '@/stores/project'
 import { useChatStore } from '@/stores/chat'
 import { updateSessionFiles, type ApiFile } from '@/api'
 import { collectAllFiles } from '@/preview/resolver'
-import { getBaseProjectFiles } from '@/templates/project-template'
+import { getBaseProjectFiles, getMainTs } from '@/templates/project-template'
+import { getCcuiComponentsAsProjectFiles, getCcuiThemeAsProjectFiles } from '@/templates/ccui-components'
 import FileTree from '@/components/FileTree.vue'
 import MonacoEditor from '@/components/MonacoEditor.vue'
 import VueReplPreview from '@/components/VueReplPreview.vue'
@@ -220,8 +221,9 @@ function handleContentChange(content: string) {
 }
 
 async function exportProject() {
+  const componentLib = chatStore.currentSession?.componentLib || 'ElementUI'
   const zip = new JSZip()
-  const baseFiles = getBaseProjectFiles()
+  const baseFiles = getBaseProjectFiles(componentLib)
 
   const findFile = (name: string) => baseFiles.find(f => f.name === name)!
 
@@ -236,10 +238,32 @@ async function exportProject() {
     return
   }
 
-  srcFolder.file('main.ts', findFile('main.ts').content)
+  srcFolder.file('main.ts', getMainTs(componentLib))
   srcFolder.file('App.vue', findFile('App.vue').content)
   srcFolder.file('style.css', findFile('style.css').content)
   srcFolder.file('vite-env.d.ts', findFile('vite-env.d.ts').content)
+
+  if (componentLib === 'ccui') {
+    const ccuiFolder = srcFolder.folder('ccui')
+    const ccuiComponents = getCcuiComponentsAsProjectFiles()
+    const ccuiTheme = getCcuiThemeAsProjectFiles()
+
+    function addCcuiFiles(files: ProjectFile[], parentFolder: JSZip) {
+      for (const file of files) {
+        if (file.type === 'folder' && file.children) {
+          const subFolder = parentFolder.folder(file.name)
+          if (subFolder) {
+            addCcuiFiles(file.children, subFolder)
+          }
+        } else if (file.type === 'file' && file.content) {
+          parentFolder.file(file.name, file.content)
+        }
+      }
+    }
+
+    addCcuiFiles(ccuiComponents, ccuiFolder!)
+    addCcuiFiles(ccuiTheme, ccuiFolder!)
+  }
 
   const allFiles = collectAllFiles(projectStore.files)
   const baseFileNames = baseFiles.map(f => f.name)
@@ -247,7 +271,8 @@ async function exportProject() {
     f.type === 'file' && 
     !f.readonly && 
     f.content &&
-    !baseFileNames.includes(f.name)
+    !baseFileNames.includes(f.name) &&
+    !f.path.includes('/ccui/')
   )
 
   for (const file of userFiles) {
