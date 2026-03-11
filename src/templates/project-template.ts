@@ -10,116 +10,178 @@ import './ccui/theme/tokens.css'
 import './style.css'
 import App from './App.vue'
 
+import CcAffix from './ccui/Affix.vue'
+import CcAnchor from './ccui/Anchor.vue'
+import CcAutocomplete from './ccui/Autocomplete.vue'
+import CcAvatar from './ccui/Avatar.vue'
+import CcBacktop from './ccui/Backtop.vue'
+import CcBorder from './ccui/Border.vue'
+import CcBreadcrumb from './ccui/Breadcrumb.vue'
+import CcBreadcrumbItem from './ccui/BreadcrumbItem.vue'
 import CcButton from './ccui/Button.vue'
-import CcInput from './ccui/Input.vue'
-import CcForm from './ccui/Form.vue'
-import CcFormItem from './ccui/FormItem.vue'
-import CcSelect from './ccui/Select.vue'
-import CcOption from './ccui/Option.vue'
+import CcCard from './ccui/Card.vue'
+import CcCascader from './ccui/Cascader.vue'
 import CcCheckbox from './ccui/Checkbox.vue'
 import CcCheckboxButton from './ccui/CheckboxButton.vue'
 import CcCheckboxGroup from './ccui/CheckboxGroup.vue'
-import CcRadio from './ccui/Radio.vue'
-import CcSwitch from './ccui/Switch.vue'
-import CcDatePicker from './ccui/DatePicker.vue'
-import CcDateTimePicker from './ccui/DateTimePicker.vue'
-import CcTimePicker from './ccui/TimePicker.vue'
-import CcTimeSelect from './ccui/TimeSelect.vue'
-import CcInputNumber from './ccui/InputNumber.vue'
-import CcInputTag from './ccui/InputTag.vue'
-import CcRate from './ccui/Rate.vue'
-import CcSlider from './ccui/Slider.vue'
+import CcCollapse from './ccui/Collapse.vue'
+import CcCollapseItem from './ccui/CollapseItem.vue'
+import CcColor from './ccui/Color.vue'
 import CcColorPicker from './ccui/ColorPicker.vue'
-import CcUpload from './ccui/Upload.vue'
-import CcTransfer from './ccui/Transfer.vue'
-import CcCascader from './ccui/Cascader.vue'
-import CcTreeSelect from './ccui/TreeSelect.vue'
-import CcAutocomplete from './ccui/Autocomplete.vue'
-import CcMention from './ccui/Mention.vue'
-import CcVirtualizedSelect from './ccui/VirtualizedSelect.vue'
 import CcContainer from './ccui/Container.vue'
 import CcContainerHeader from './ccui/ContainerHeader.vue'
 import CcContainerAside from './ccui/ContainerAside.vue'
 import CcContainerMain from './ccui/ContainerMain.vue'
 import CcContainerFooter from './ccui/ContainerFooter.vue'
-import CcLayoutRow from './ccui/LayoutRow.vue'
-import CcLayoutCol from './ccui/LayoutCol.vue'
-import CcSpace from './ccui/Space.vue'
-import CcDivider from './ccui/Divider.vue'
-import CcLink from './ccui/Link.vue'
-import CcIcon from './ccui/Icon.vue'
-import CcScrollbar from './ccui/Scrollbar.vue'
-import CcAffix from './ccui/Affix.vue'
-import CcAnchor from './ccui/Anchor.vue'
-import CcResult from './ccui/Result.vue'
+import CcDatePicker from './ccui/DatePicker.vue'
+import CcDateTimePicker from './ccui/DateTimePicker.vue'
 import CcDescriptions from './ccui/Descriptions.vue'
 import CcDescriptionsItem from './ccui/DescriptionsItem.vue'
+import CcDialog from './ccui/Dialog.vue'
+import CcDivider from './ccui/Divider.vue'
+import CcDrawer from './ccui/Drawer.vue'
+import CcDropdown from './ccui/Dropdown.vue'
 import CcEllipsis from './ccui/Ellipsis.vue'
+import CcForm from './ccui/Form.vue'
+import CcFormItem from './ccui/FormItem.vue'
+import CcIcon from './ccui/Icon.vue'
+import CcImage from './ccui/Image.vue'
+import CcInput from './ccui/Input.vue'
+import CcInputNumber from './ccui/InputNumber.vue'
+import CcInputTag from './ccui/InputTag.vue'
+import CcLayoutRow from './ccui/LayoutRow.vue'
+import CcLayoutCol from './ccui/LayoutCol.vue'
+import CcLink from './ccui/Link.vue'
+import CcMenu from './ccui/Menu.vue'
+import CcMenuItem from './ccui/MenuItem.vue'
+import CcMenuItemGroup from './ccui/MenuItemGroup.vue'
+import CcSubMenu from './ccui/SubMenu.vue'
+import CcMention from './ccui/Mention.vue'
+import CcMessage from './ccui/Message.vue'
+import CcMessageBox from './ccui/MessageBox.vue'
+import CcOption from './ccui/Option.vue'
+import CcOptionGroup from './ccui/OptionGroup.vue'
+import CcPageHeader from './ccui/PageHeader.vue'
+import CcPagination from './ccui/Pagination.vue'
+import CcPopconfirm from './ccui/Popconfirm.vue'
+import CcPopover from './ccui/Popover.vue'
+import CcRadio from './ccui/Radio.vue'
+import CcRate from './ccui/Rate.vue'
+import CcResult from './ccui/Result.vue'
+import CcScrollbar from './ccui/Scrollbar.vue'
+import CcSegmented from './ccui/Segmented.vue'
+import CcSelect from './ccui/Select.vue'
+import CcSlider from './ccui/Slider.vue'
+import CcSpace from './ccui/Space.vue'
+import CcStatistic from './ccui/Statistic.vue'
+import CcStep from './ccui/Step.vue'
+import CcSteps from './ccui/Steps.vue'
+import CcSwitch from './ccui/Switch.vue'
+import CcTabPane from './ccui/TabPane.vue'
+import CcTable from './ccui/Table.vue'
+import CcTabs from './ccui/Tabs.vue'
+import CcTag from './ccui/Tag.vue'
+import CcTimePicker from './ccui/TimePicker.vue'
+import CcTimeSelect from './ccui/TimeSelect.vue'
+import CcTooltip from './ccui/Tooltip.vue'
+import CcTransfer from './ccui/Transfer.vue'
+import CcTree from './ccui/Tree.vue'
+import CcTreeSelect from './ccui/TreeSelect.vue'
 import CcTypography from './ccui/Typography.vue'
 import CcTypographyText from './ccui/TypographyText.vue'
 import CcTypographyTitle from './ccui/TypographyTitle.vue'
 import CcTypographyParagraph from './ccui/TypographyParagraph.vue'
 import CcTypographyLink from './ccui/TypographyLink.vue'
-import CcBorder from './ccui/Border.vue'
-import CcColor from './ccui/Color.vue'
-import CcOptionGroup from './ccui/OptionGroup.vue'
+import CcUpload from './ccui/Upload.vue'
+import CcVirtualizedSelect from './ccui/VirtualizedSelect.vue'
 
 const app = createApp(App)
 app.use(ElementPlus)
 
+app.component('CcAffix', CcAffix)
+app.component('CcAnchor', CcAnchor)
+app.component('CcAutocomplete', CcAutocomplete)
+app.component('CcAvatar', CcAvatar)
+app.component('CcBacktop', CcBacktop)
+app.component('CcBorder', CcBorder)
+app.component('CcBreadcrumb', CcBreadcrumb)
+app.component('CcBreadcrumbItem', CcBreadcrumbItem)
 app.component('CcButton', CcButton)
-app.component('CcInput', CcInput)
-app.component('CcForm', CcForm)
-app.component('CcFormItem', CcFormItem)
-app.component('CcSelect', CcSelect)
-app.component('CcOption', CcOption)
+app.component('CcCard', CcCard)
+app.component('CcCascader', CcCascader)
 app.component('CcCheckbox', CcCheckbox)
 app.component('CcCheckboxButton', CcCheckboxButton)
 app.component('CcCheckboxGroup', CcCheckboxGroup)
-app.component('CcRadio', CcRadio)
-app.component('CcSwitch', CcSwitch)
-app.component('CcDatePicker', CcDatePicker)
-app.component('CcDateTimePicker', CcDateTimePicker)
-app.component('CcTimePicker', CcTimePicker)
-app.component('CcTimeSelect', CcTimeSelect)
-app.component('CcInputNumber', CcInputNumber)
-app.component('CcInputTag', CcInputTag)
-app.component('CcRate', CcRate)
-app.component('CcSlider', CcSlider)
+app.component('CcCollapse', CcCollapse)
+app.component('CcCollapseItem', CcCollapseItem)
+app.component('CcColor', CcColor)
 app.component('CcColorPicker', CcColorPicker)
-app.component('CcUpload', CcUpload)
-app.component('CcTransfer', CcTransfer)
-app.component('CcCascader', CcCascader)
-app.component('CcTreeSelect', CcTreeSelect)
-app.component('CcAutocomplete', CcAutocomplete)
-app.component('CcMention', CcMention)
-app.component('CcVirtualizedSelect', CcVirtualizedSelect)
 app.component('CcContainer', CcContainer)
 app.component('CcContainerHeader', CcContainerHeader)
 app.component('CcContainerAside', CcContainerAside)
 app.component('CcContainerMain', CcContainerMain)
 app.component('CcContainerFooter', CcContainerFooter)
-app.component('CcLayoutRow', CcLayoutRow)
-app.component('CcLayoutCol', CcLayoutCol)
-app.component('CcSpace', CcSpace)
-app.component('CcDivider', CcDivider)
-app.component('CcLink', CcLink)
-app.component('CcIcon', CcIcon)
-app.component('CcScrollbar', CcScrollbar)
-app.component('CcAffix', CcAffix)
-app.component('CcAnchor', CcAnchor)
-app.component('CcResult', CcResult)
+app.component('CcDatePicker', CcDatePicker)
+app.component('CcDateTimePicker', CcDateTimePicker)
 app.component('CcDescriptions', CcDescriptions)
 app.component('CcDescriptionsItem', CcDescriptionsItem)
+app.component('CcDialog', CcDialog)
+app.component('CcDivider', CcDivider)
+app.component('CcDrawer', CcDrawer)
+app.component('CcDropdown', CcDropdown)
 app.component('CcEllipsis', CcEllipsis)
+app.component('CcForm', CcForm)
+app.component('CcFormItem', CcFormItem)
+app.component('CcIcon', CcIcon)
+app.component('CcImage', CcImage)
+app.component('CcInput', CcInput)
+app.component('CcInputNumber', CcInputNumber)
+app.component('CcInputTag', CcInputTag)
+app.component('CcLayoutRow', CcLayoutRow)
+app.component('CcLayoutCol', CcLayoutCol)
+app.component('CcLink', CcLink)
+app.component('CcMenu', CcMenu)
+app.component('CcMenuItem', CcMenuItem)
+app.component('CcMenuItemGroup', CcMenuItemGroup)
+app.component('CcSubMenu', CcSubMenu)
+app.component('CcMention', CcMention)
+app.component('CcMessage', CcMessage)
+app.component('CcMessageBox', CcMessageBox)
+app.component('CcOption', CcOption)
+app.component('CcOptionGroup', CcOptionGroup)
+app.component('CcPageHeader', CcPageHeader)
+app.component('CcPagination', CcPagination)
+app.component('CcPopconfirm', CcPopconfirm)
+app.component('CcPopover', CcPopover)
+app.component('CcRadio', CcRadio)
+app.component('CcRate', CcRate)
+app.component('CcResult', CcResult)
+app.component('CcScrollbar', CcScrollbar)
+app.component('CcSegmented', CcSegmented)
+app.component('CcSelect', CcSelect)
+app.component('CcSlider', CcSlider)
+app.component('CcSpace', CcSpace)
+app.component('CcStatistic', CcStatistic)
+app.component('CcStep', CcStep)
+app.component('CcSteps', CcSteps)
+app.component('CcSwitch', CcSwitch)
+app.component('CcTabPane', CcTabPane)
+app.component('CcTable', CcTable)
+app.component('CcTabs', CcTabs)
+app.component('CcTag', CcTag)
+app.component('CcTimePicker', CcTimePicker)
+app.component('CcTimeSelect', CcTimeSelect)
+app.component('CcTooltip', CcTooltip)
+app.component('CcTransfer', CcTransfer)
+app.component('CcTree', CcTree)
+app.component('CcTreeSelect', CcTreeSelect)
 app.component('CcTypography', CcTypography)
 app.component('CcTypographyText', CcTypographyText)
 app.component('CcTypographyTitle', CcTypographyTitle)
 app.component('CcTypographyParagraph', CcTypographyParagraph)
 app.component('CcTypographyLink', CcTypographyLink)
-app.component('CcBorder', CcBorder)
-app.component('CcColor', CcColor)
-app.component('CcOptionGroup', CcOptionGroup)
+app.component('CcUpload', CcUpload)
+app.component('CcVirtualizedSelect', CcVirtualizedSelect)
 
 app.mount('#app')
 `
