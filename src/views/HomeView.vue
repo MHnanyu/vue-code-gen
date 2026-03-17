@@ -19,6 +19,43 @@
           @keydown.enter.ctrl="handleGenerate"
         />
 
+        <div v-if="fileList.length > 0" class="mt-4 flex flex-wrap gap-3">
+          <div
+            v-for="file in fileList"
+            :key="file.uid"
+            class="relative group inline-block"
+          >
+            <div class="relative">
+              <el-popover
+                v-if="isImageFile(file)"
+                placement="top"
+                :width="200"
+                trigger="hover"
+              >
+                <template #reference>
+                  <div class="w-16 h-16 rounded-lg overflow-hidden border-2 border-gray-200 cursor-pointer hover:border-indigo-400 transition-colors">
+                    <img :src="getFilePreview(file)" class="w-full h-full object-cover" />
+                  </div>
+                </template>
+                <img :src="getFilePreview(file)" class="w-full rounded" />
+              </el-popover>
+              <div
+                v-else
+                class="w-16 h-16 rounded-lg border-2 border-gray-200 flex flex-col items-center justify-center bg-gray-50 hover:border-indigo-400 transition-colors cursor-pointer"
+              >
+                <el-icon size="20" class="text-blue-500"><Document /></el-icon>
+                <span class="text-xs text-gray-500 mt-1 max-w-[56px] truncate">{{ getFileExtension(file.name) }}</span>
+              </div>
+              <div
+                class="absolute top-0 right-0 -translate-y-1/2 translate-x-1/2 w-5 h-5 bg-gray-500 rounded-full flex items-center justify-center cursor-pointer opacity-0 group-hover:opacity-100 transition-opacity hover:bg-gray-600"
+                @click="removeFile(file)"
+              >
+                <el-icon size="12" color="white"><Close /></el-icon>
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="flex justify-between items-center mt-4 pt-4 border-t border-gray-200">
           <div class="flex gap-3 items-center">
             <el-tag type="success" effect="plain" size="large">Vue3</el-tag>
@@ -29,9 +66,27 @@
             </el-select>
           </div>
 
-          <el-button type="success" :loading="loading" :disabled="!prompt.trim()" @click="handleGenerate">
-            生成 ➤
-          </el-button>
+          <div class="flex items-center gap-3">
+            <el-tooltip content="上传图片或txt、md文件" placement="top">
+              <el-upload
+                ref="uploadRef"
+                v-model:file-list="fileList"
+                :auto-upload="false"
+                :accept="'.md,.txt,image/*'"
+                :limit="5"
+                :show-file-list="false"
+                :on-change="handleFileChange"
+              >
+                <el-button circle>
+                  <el-icon size="18"><Paperclip /></el-icon>
+                </el-button>
+              </el-upload>
+            </el-tooltip>
+
+            <el-button type="success" :loading="loading" :disabled="!canGenerate" @click="handleGenerate">
+              生成 ➤
+            </el-button>
+          </div>
         </div>
       </el-card>
 
@@ -44,11 +99,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGeneratorStore } from '@/stores/generator'
 import { useChatStore } from '@/stores/chat'
 import type { ComponentLib } from '@/types'
+import type { UploadFile, UploadUserFile, UploadInstance } from 'element-plus'
+import { Upload, Paperclip, Document, Close } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const store = useGeneratorStore()
@@ -58,18 +115,72 @@ const libs = ['ElementUI', 'AUI', 'CcUI']
 const prompt = ref('')
 const selectedLib = ref('ElementUI')
 const loading = ref(false)
+const uploadRef = ref<UploadInstance>()
+const fileList = ref<UploadUserFile[]>([])
+
+const canGenerate = computed(() => {
+  return prompt.value.trim() || fileList.value.length > 0
+})
+
+function isImageFile(file: UploadFile) {
+  return file.raw?.type.startsWith('image/')
+}
+
+function getFilePreview(file: UploadFile) {
+  if (file.raw) {
+    return URL.createObjectURL(file.raw)
+  }
+  return ''
+}
+
+function getFileExtension(filename: string) {
+  const ext = filename.split('.').pop()?.toUpperCase()
+  return ext || 'FILE'
+}
+
+function handleFileChange(file: UploadFile, files: UploadUserFile[]) {
+  fileList.value = files
+}
+
+function removeFile(file: UploadFile) {
+  const index = fileList.value.findIndex(f => f.uid === file.uid)
+  if (index > -1) {
+    fileList.value.splice(index, 1)
+  }
+}
+
+async function uploadFiles(): Promise<string[]> {
+  if (fileList.value.length === 0) return []
+  
+  // TODO: 调用上传接口
+  // const formData = new FormData()
+  // fileList.value.forEach(file => {
+  //   if (file.raw) formData.append('files', file.raw)
+  // })
+  // const response = await api.uploadFiles(formData)
+  // return response.data.urls
+  
+  // 临时返回文件名列表
+  return fileList.value.map(f => f.name)
+}
 
 async function handleGenerate() {
-  if (!prompt.value.trim() || loading.value) return
+  if (!canGenerate.value || loading.value) return
 
   loading.value = true
   try {
+    const uploadedUrls = await uploadFiles()
+    
     store.setPrompt(prompt.value)
     store.clearFiles()
+    
+    // TODO: 将上传的文件URL传递给后端
+    // chatStore.setAttachments(uploadedUrls)
+    
     chatStore.setPendingPrompt(prompt.value)
 
     const sessionId = await chatStore.createSessionRemote(
-      prompt.value.slice(0, 30),
+      prompt.value.slice(0, 30) || `基于${fileList.value.length}个文件生成`,
       selectedLib.value as ComponentLib
     )
     if (sessionId) {

@@ -29,9 +29,10 @@ import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Loading, Back } from '@element-plus/icons-vue'
-import { getSession, transformApiFiles } from '@/api'
+import { getSession } from '@/api'
+import { buildProjectFiles } from '@/templates/project-template'
 import VueReplPreview from '@/components/VueReplPreview.vue'
-import type { ProjectFile } from '@/types'
+import type { ProjectFile, ComponentLib } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -40,12 +41,36 @@ const files = ref<ProjectFile[]>([])
 const isLoading = ref(false)
 const replPreviewRef = ref<InstanceType<typeof VueReplPreview> | null>(null)
 
+const SYSTEM_FILE_PATHS = new Set([
+  '/src/main.ts',
+  '/src/App.vue',
+  '/src/style.css',
+  '/public/index.html',
+  '/package.json',
+  '/vite.config.ts',
+])
+
+function filterUserFiles(fileList: any[]): any[] {
+  return fileList.filter(f => !SYSTEM_FILE_PATHS.has(f.path))
+}
+
 async function loadSessionFiles(sessionId: string) {
   isLoading.value = true
   try {
     const apiSession = await getSession(sessionId)
-    if (apiSession.files) {
-      files.value = transformApiFiles(apiSession.files)
+    if (apiSession.files && apiSession.files.length > 0) {
+      const componentLib: ComponentLib = apiSession.componentLib || 'ElementUI'
+      const userFiles = filterUserFiles(apiSession.files)
+      const mainPageContent = userFiles[0]?.content || ''
+      const extraFiles: ProjectFile[] = userFiles.slice(1).map((f: any) => ({
+        id: f.id,
+        name: f.name,
+        path: f.path,
+        type: f.type as 'file',
+        language: f.language as any,
+        content: f.content,
+      }))
+      files.value = buildProjectFiles(mainPageContent, extraFiles, componentLib)
     }
   } catch (error) {
     console.error('Failed to load session:', error)
