@@ -29,7 +29,7 @@
         <Repl
           v-show="isReplReady"
           :store="replStore"
-          :editor="Monaco"
+          :editor="CodeMirror"
           :preview-options="previewOptions"
           :show-compile-output="false"
           :show-import-map="false"
@@ -47,7 +47,7 @@ import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
 import { Repl, useStore, useVueImportMap } from '@vue/repl'
-import Monaco from '@vue/repl/monaco-editor'
+import CodeMirror from '@vue/repl/codemirror-editor'
 import { collectAllFiles } from '@/preview/resolver'
 import type { ProjectFile } from '@/types'
 import ccuiTokensCss from '@/ccui/theme/tokens.css?raw'

@@ -39,6 +39,20 @@
               class="px-4 py-3 rounded-xl leading-relaxed break-words"
               :class="message.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-100'"
             >
+              <div v-if="message.attachments?.length" class="flex flex-wrap gap-2 mb-2">
+                <template v-for="att in message.attachments" :key="att.id">
+                  <el-popover v-if="att.type === 'image'" placement="top" :width="300" trigger="hover">
+                    <template #reference>
+                      <img :src="`${API_BASE}${att.url}`" class="w-16 h-16 rounded-lg object-cover cursor-pointer border-2 border-white/30" />
+                    </template>
+                    <img :src="`${API_BASE}${att.url}`" class="w-full rounded" />
+                  </el-popover>
+                  <div v-else class="flex items-center gap-1 px-2 py-1 rounded bg-blue-400 text-white text-xs">
+                    <el-icon><Document /></el-icon>
+                    <span class="max-w-[80px] truncate">{{ att.name }}</span>
+                  </div>
+                </template>
+              </div>
               {{ message.content }}
             </div>
             <div class="text-xs text-gray-400 mt-1">{{ formatTime(message.timestamp) }}</div>
@@ -99,11 +113,11 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
-import { DArrowRight, Loading } from '@element-plus/icons-vue'
+import { DArrowRight, Loading, Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useChatStore } from '@/stores/chat'
 import { useProjectStore } from '@/stores/project'
-import { generateInitial, generateIterate, type ApiFile } from '@/api'
+import { generateInitial, generateIterate, type ApiFile, type Attachment, API_BASE } from '@/api'
 import { buildProjectFiles } from '@/templates/project-template'
 import type { ProjectFile } from '@/types'
 
@@ -122,6 +136,7 @@ const projectStore = useProjectStore()
 const inputMessage = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const pendingUserMessage = ref('')
+const currentAttachments = ref<Attachment[]>([])
 
 const currentSession = computed(() => chatStore.currentSession)
 const isLoading = computed(() => chatStore.isLoading)
@@ -140,6 +155,12 @@ watch(() => chatStore.pendingPrompt, (prompt) => {
   if (prompt && prompt.trim()) {
     chatStore.setPendingPrompt(null)
     inputMessage.value = prompt
+    
+    if (chatStore.pendingAttachments.length > 0) {
+      currentAttachments.value = [...chatStore.pendingAttachments]
+      chatStore.clearPendingAttachments()
+    }
+    
     sendMessage()
   }
 }, { immediate: true })
@@ -165,57 +186,64 @@ async function sendMessage() {
     }
   }
 
-  chatStore.addMessageLocal(sessionId, { role: 'user', content: message })
+  const attachmentsToSend = currentAttachments.value.length > 0 ? [...currentAttachments.value] : undefined
+  currentAttachments.value = []
+  
   pendingUserMessage.value = message
   scrollToBottom()
   chatStore.setLoading(true)
 
   try {
+    await chatStore.addMessageRemote(sessionId, { 
+      role: 'user', 
+      content: message, 
+      attachments: attachmentsToSend 
+    })
+    
     const hasExistingFiles = currentSession.value?.files && currentSession.value.files.length > 0
     
+    let result
     if (hasExistingFiles) {
-      const result = await generateIterate({
+      result = await generateIterate({
         prompt: message,
         sessionId,
         files: currentSession.value!.files!,
       })
-      processResult(result.files, result.message)
     } else {
-      const result = await generateInitial({
+      result = await generateInitial({
         prompt: message,
         sessionId,
         debug: false,
         componentLib: currentSession.value?.componentLib,
+        attachments: attachmentsToSend,
       })
-      processResult(result.files, result.message)
     }
 
-    function processResult(files: ApiFile[], msg: string) {
-      const SYSTEM_FILE_PATHS = new Set([
-        '/src/main.ts',
-        '/src/App.vue',
-        '/src/style.css',
-        '/public/index.html',
-        '/package.json',
-        '/vite.config.ts',
-      ])
+    const SYSTEM_FILE_PATHS = new Set([
+      '/src/main.ts',
+      '/src/App.vue',
+      '/src/style.css',
+      '/public/index.html',
+      '/package.json',
+      '/vite.config.ts',
+    ])
 
-      const userFiles = files?.filter(f => !SYSTEM_FILE_PATHS.has(f.path)) || []
+    const userFiles = result.files?.filter(f => !SYSTEM_FILE_PATHS.has(f.path)) || []
 
-      const mainPageContent = userFiles[0]?.content || ''
-      const extraFiles: ProjectFile[] = userFiles.slice(1).map((f) => ({
-        id: f.id,
-        name: f.name,
-        path: f.path,
-        type: f.type as 'file',
-        language: f.language as ProjectFile['language'],
-        content: f.content,
-      }))
-      const projectFiles = buildProjectFiles(mainPageContent, extraFiles, currentSession.value?.componentLib)
-      projectStore.setFiles(projectFiles)
-      chatStore.updateSessionFiles(sessionId!, userFiles)
-      chatStore.addMessageLocal(sessionId!, { role: 'assistant', content: msg })
-    }
+    const mainPageContent = userFiles[0]?.content || ''
+    const extraFiles: ProjectFile[] = userFiles.slice(1).map((f) => ({
+      id: f.id,
+      name: f.name,
+      path: f.path,
+      type: f.type as 'file',
+      language: f.language as ProjectFile['language'],
+      content: f.content,
+    }))
+    const projectFiles = buildProjectFiles(mainPageContent, extraFiles, currentSession.value?.componentLib)
+    projectStore.setFiles(projectFiles)
+    chatStore.updateSessionFiles(sessionId!, userFiles)
+    
+    await chatStore.addMessageRemote(sessionId!, { role: 'assistant', content: result.message })
 
     ElMessage.success('生成成功')
   } catch (error) {

@@ -1,11 +1,19 @@
 import type { ApiFile } from '@/api'
 
 // 对话消息类型
+export interface Attachment {
+  id: string
+  url: string
+  name: string
+  type: 'image' | 'text' | 'markdown'
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
+  attachments?: Attachment[]
 }
 
 export type ComponentLib = 'ElementUI' | 'aui' | 'ccui'

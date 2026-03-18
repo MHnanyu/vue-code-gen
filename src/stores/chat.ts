@@ -1,12 +1,14 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { ChatMessage, ChatSession, ComponentLib } from '@/types'
+import type { Attachment } from '@/api'
 import {
   createSession as apiCreateSession,
   getSessions as apiGetSessions,
   getSession as apiGetSession,
   deleteSession as apiDeleteSession,
   updateSessionTitle as apiUpdateSessionTitle,
+  addMessage as apiAddMessage,
   transformApiSession,
 } from '@/api'
 
@@ -15,6 +17,7 @@ export const useChatStore = defineStore('chat', () => {
   const currentSessionId = ref<string | null>(null)
   const isLoading = ref(false)
   const pendingPrompt = ref<string | null>(null)
+  const pendingAttachments = ref<Attachment[]>([])
 
   const currentSession = computed(() =>
     sessions.value.find(s => s.id === currentSessionId.value) || null
@@ -119,6 +122,32 @@ export const useChatStore = defineStore('chat', () => {
     return newMessage
   }
 
+  async function addMessageRemote(sessionId: string, message: Omit<ChatMessage, 'id' | 'timestamp'>) {
+    const session = sessions.value.find(s => s.id === sessionId)
+    if (!session) return
+
+    try {
+      const apiMessage = await apiAddMessage(sessionId, {
+        role: message.role,
+        content: message.content,
+        attachments: message.attachments,
+      })
+      
+      const newMessage: ChatMessage = {
+        id: apiMessage.id,
+        role: apiMessage.role,
+        content: apiMessage.content,
+        timestamp: new Date(apiMessage.timestamp),
+        attachments: apiMessage.attachments,
+      }
+      session.messages.push(newMessage)
+      session.updatedAt = new Date()
+      return newMessage
+    } catch (error) {
+      console.error('Failed to add message:', error)
+    }
+  }
+
   function deleteSession(id: string) {
     const index = sessions.value.findIndex(s => s.id === id)
     if (index > -1) {
@@ -137,6 +166,14 @@ export const useChatStore = defineStore('chat', () => {
     pendingPrompt.value = prompt
   }
 
+  function setPendingAttachments(attachments: Attachment[]) {
+    pendingAttachments.value = attachments
+  }
+
+  function clearPendingAttachments() {
+    pendingAttachments.value = []
+  }
+
   function updateSessionFiles(sessionId: string, files: ChatSession['files']) {
     const session = sessions.value.find(s => s.id === sessionId)
     if (session) {
@@ -150,12 +187,14 @@ export const useChatStore = defineStore('chat', () => {
     currentSessionId,
     isLoading,
     pendingPrompt,
+    pendingAttachments,
     currentSession,
     sortedSessions,
     createSession,
     createSessionRemote,
     selectSession,
     addMessageLocal,
+    addMessageRemote,
     deleteSession,
     deleteSessionRemote,
     updateSessionTitleRemote,
@@ -163,6 +202,8 @@ export const useChatStore = defineStore('chat', () => {
     loadSession,
     setLoading,
     setPendingPrompt,
+    setPendingAttachments,
+    clearPendingAttachments,
     updateSessionFiles
   }
 })

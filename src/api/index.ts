@@ -1,6 +1,6 @@
 import type { ProjectFile, ComponentLib } from '@/types'
 
-const API_BASE = 'http://localhost:8000'
+export const API_BASE = 'http://localhost:8000'
 
 interface ApiResponse<T> {
   code: number
@@ -20,6 +20,13 @@ interface ApiFile {
 
 export type { ApiFile }
 
+export interface Attachment {
+  id: string
+  url: string
+  name: string
+  type: 'image' | 'text' | 'markdown'
+}
+
 interface ApiSession {
   id: string
   userId?: string | null
@@ -36,6 +43,7 @@ interface ApiMessage {
   role: 'user' | 'assistant'
   content: string
   timestamp: string
+  attachments?: Attachment[]
 }
 
 interface CreateSessionRequest {
@@ -46,6 +54,7 @@ interface CreateSessionRequest {
 interface AddMessageRequest {
   role: 'user' | 'assistant'
   content: string
+  attachments?: Attachment[]
 }
 
 interface SessionListResponse {
@@ -83,6 +92,7 @@ interface GenerateInitialRequest {
   sessionId: string
   debug?: boolean
   componentLib?: ComponentLib
+  attachments?: Attachment[]
 }
 
 interface GenerateIterateRequest {
@@ -190,6 +200,7 @@ export function transformApiSession(session: ApiSession) {
       role: msg.role,
       content: msg.content,
       timestamp: parseDate(msg.timestamp),
+      attachments: msg.attachments,
     })),
     files: session.files,
     componentLib: session.componentLib,
@@ -207,4 +218,32 @@ export async function updateSessionFiles(sessionId: string, files: ApiFile[]): P
     method: 'PATCH',
     body: JSON.stringify({ files } as UpdateFilesRequest),
   })
+}
+
+interface UploadResponse {
+  files: Attachment[]
+}
+
+export async function uploadFiles(files: File[]): Promise<UploadResponse> {
+  const formData = new FormData()
+  files.forEach((file) => {
+    formData.append('files', file)
+  })
+
+  const response = await fetch(`${API_BASE}/api/upload`, {
+    method: 'POST',
+    body: formData,
+  })
+
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`)
+  }
+
+  const result: ApiResponse<UploadResponse> = await response.json()
+
+  if (result.code !== 0) {
+    throw new Error(result.message || 'API error')
+  }
+
+  return result.data
 }

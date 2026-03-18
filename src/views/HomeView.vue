@@ -103,6 +103,7 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useGeneratorStore } from '@/stores/generator'
 import { useChatStore } from '@/stores/chat'
+import { uploadFiles as apiUploadFiles, type Attachment } from '@/api'
 import type { ComponentLib } from '@/types'
 import type { UploadFile, UploadUserFile, UploadInstance } from 'element-plus'
 import { Upload, Paperclip, Document, Close } from '@element-plus/icons-vue'
@@ -149,38 +150,28 @@ function removeFile(file: UploadFile) {
   }
 }
 
-async function uploadFiles(): Promise<string[]> {
-  if (fileList.value.length === 0) return []
-  
-  // TODO: 调用上传接口
-  // const formData = new FormData()
-  // fileList.value.forEach(file => {
-  //   if (file.raw) formData.append('files', file.raw)
-  // })
-  // const response = await api.uploadFiles(formData)
-  // return response.data.urls
-  
-  // 临时返回文件名列表
-  return fileList.value.map(f => f.name)
-}
-
 async function handleGenerate() {
   if (!canGenerate.value || loading.value) return
 
   loading.value = true
   try {
-    const uploadedUrls = await uploadFiles()
-    
-    store.setPrompt(prompt.value)
+    let attachments: Attachment[] = []
+
+    if (fileList.value.length > 0) {
+      const files = fileList.value.filter(f => f.raw).map(f => f.raw!)
+      const result = await apiUploadFiles(files)
+      attachments = result.files
+    }
+
+    const finalPrompt = prompt.value.trim() || `根据上传的${attachments.length}个文件生成页面`
+
+    store.setPrompt(finalPrompt)
     store.clearFiles()
-    
-    // TODO: 将上传的文件URL传递给后端
-    // chatStore.setAttachments(uploadedUrls)
-    
-    chatStore.setPendingPrompt(prompt.value)
+    chatStore.setPendingPrompt(finalPrompt)
+    chatStore.setPendingAttachments(attachments)
 
     const sessionId = await chatStore.createSessionRemote(
-      prompt.value.slice(0, 30) || `基于${fileList.value.length}个文件生成`,
+      prompt.value.slice(0, 30) || `基于${attachments.length}个文件生成`,
       selectedLib.value as ComponentLib
     )
     if (sessionId) {
