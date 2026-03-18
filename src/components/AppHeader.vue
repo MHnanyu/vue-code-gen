@@ -6,13 +6,12 @@
     </div>
     
     <nav class="flex gap-6">
-      <router-link 
+      <a
         class="text-gray-500 font-medium py-2 border-b-2 border-transparent transition-all hover:text-primary"
-        active-class="text-primary border-primary"
-        to="/workspace"
+        href="http://localhost:3000/workspace"
       >
         工作台
-      </router-link>
+      </a>
       <router-link 
         class="text-gray-500 font-medium py-2 border-b-2 border-transparent transition-all hover:text-primary"
         active-class="text-primary border-primary"
