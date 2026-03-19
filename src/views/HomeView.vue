@@ -22,7 +22,7 @@
         <div v-if="fileList.length > 0" class="mt-4 flex flex-wrap gap-3">
           <div
             v-for="file in fileList"
-            :key="file.uid"
+            :key="file.uid || file.name"
             class="relative group inline-block"
           >
             <div class="relative">
@@ -67,15 +67,28 @@
           </div>
 
           <div class="flex items-center gap-3">
-            <el-tooltip content="上传图片或txt、md文件" placement="top">
+            <el-tooltip content="上传图片" placement="top">
               <el-upload
-                ref="uploadRef"
-                v-model:file-list="fileList"
+                v-model:file-list="imageList"
                 :auto-upload="false"
-                :accept="'.md,.txt,image/*'"
+                accept="image/*"
                 :limit="5"
                 :show-file-list="false"
-                :on-change="handleFileChange"
+                :on-change="handleImageChange"
+              >
+                <el-button circle>
+                  <el-icon size="18"><Picture /></el-icon>
+                </el-button>
+              </el-upload>
+            </el-tooltip>
+            <el-tooltip content="上传附件" placement="top">
+              <el-upload
+                v-model:file-list="attachList"
+                :auto-upload="false"
+                accept=".md,.txt"
+                :limit="5"
+                :show-file-list="false"
+                :on-change="handleAttachChange"
               >
                 <el-button circle>
                   <el-icon size="18"><Paperclip /></el-icon>
@@ -89,11 +102,6 @@
           </div>
         </div>
       </el-card>
-
-      <div class="text-gray-400 text-sm">
-        支持的组件库：
-        <el-tag v-for="lib in libs" :key="lib" effect="dark" round class="ml-2">{{ lib }}</el-tag>
-      </div>
     </div>
   </div>
 </template>
@@ -105,19 +113,20 @@ import { useGeneratorStore } from '@/stores/generator'
 import { useChatStore } from '@/stores/chat'
 import { uploadFiles as apiUploadFiles, type Attachment } from '@/api'
 import type { ComponentLib } from '@/types'
-import type { UploadFile, UploadUserFile, UploadInstance } from 'element-plus'
-import { Upload, Paperclip, Document, Close } from '@element-plus/icons-vue'
+import type { UploadFile, UploadUserFile } from 'element-plus'
+import { Paperclip, Picture, Document, Close } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const store = useGeneratorStore()
 const chatStore = useChatStore()
 
-const libs = ['ElementUI', 'AUI', 'CcUI']
 const prompt = ref('')
-const selectedLib = ref('ElementUI')
+const selectedLib = ref('aui')
 const loading = ref(false)
-const uploadRef = ref<UploadInstance>()
-const fileList = ref<UploadUserFile[]>([])
+const imageList = ref<UploadUserFile[]>([])
+const attachList = ref<UploadUserFile[]>([])
+
+const fileList = computed(() => [...imageList.value, ...attachList.value])
 
 const canGenerate = computed(() => {
   return prompt.value.trim() || fileList.value.length > 0
@@ -139,14 +148,23 @@ function getFileExtension(filename: string) {
   return ext || 'FILE'
 }
 
-function handleFileChange(file: UploadFile, files: UploadUserFile[]) {
-  fileList.value = files
+function handleImageChange(_file: UploadFile, files: UploadUserFile[]) {
+  imageList.value = files
+}
+
+function handleAttachChange(_file: UploadFile, files: UploadUserFile[]) {
+  attachList.value = files
 }
 
 function removeFile(file: UploadFile) {
-  const index = fileList.value.findIndex(f => f.uid === file.uid)
+  let index = imageList.value.findIndex(f => f.uid === file.uid)
   if (index > -1) {
-    fileList.value.splice(index, 1)
+    imageList.value.splice(index, 1)
+    return
+  }
+  index = attachList.value.findIndex(f => f.uid === file.uid)
+  if (index > -1) {
+    attachList.value.splice(index, 1)
   }
 }
 

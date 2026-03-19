@@ -1,4 +1,4 @@
-import type { ProjectFile, ComponentLib } from '@/types'
+import type { ProjectFile, ComponentLib, Stages } from '@/types'
 
 export const API_BASE = 'http://localhost:8000'
 
@@ -44,6 +44,8 @@ interface ApiMessage {
   content: string
   timestamp: string
   attachments?: Attachment[]
+  failedStep?: number | null
+  stages?: Stages | null
 }
 
 interface CreateSessionRequest {
@@ -93,6 +95,7 @@ interface GenerateInitialRequest {
   debug?: boolean
   componentLib?: ComponentLib
   attachments?: Attachment[]
+  fromStep?: number | null
 }
 
 interface GenerateIterateRequest {
@@ -103,19 +106,21 @@ interface GenerateIterateRequest {
 
 interface StageInfo {
   status: 'success' | 'skipped' | 'error'
-  duration: number
-  output?: string
-  error?: string
+  duration: number | null
+  output: string | null
+  error: string | null
 }
 
 interface GenerateInitialResponse {
   files: ApiFile[]
   message: string
   stages?: {
+    attachment?: StageInfo
     requirement?: StageInfo
     generation?: StageInfo
     optimization?: StageInfo
   }
+  failedStep?: number | null
 }
 
 interface GenerateIterateResponse {
@@ -201,6 +206,8 @@ export function transformApiSession(session: ApiSession) {
       content: msg.content,
       timestamp: parseDate(msg.timestamp),
       attachments: msg.attachments,
+      failedStep: msg.failedStep,
+      stages: msg.stages,
     })),
     files: session.files,
     componentLib: session.componentLib,

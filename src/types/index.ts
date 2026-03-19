@@ -8,12 +8,28 @@ export interface Attachment {
   type: 'image' | 'text' | 'markdown'
 }
 
+export interface StageInfo {
+  status: 'success' | 'skipped' | 'error'
+  duration: number | null
+  output: string | null
+  error: string | null
+}
+
+export interface Stages {
+  attachment?: StageInfo
+  requirement?: StageInfo
+  generation?: StageInfo
+  optimization?: StageInfo
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
   timestamp: Date
   attachments?: Attachment[]
+  failedStep?: number | null
+  stages?: Stages | null
 }
 
 export type ComponentLib = 'ElementUI' | 'aui' | 'ccui'

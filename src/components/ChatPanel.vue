@@ -55,6 +55,19 @@
               </div>
               {{ message.content }}
             </div>
+            <div v-if="message.failedStep != null" class="mt-2">
+              <el-button type="warning" size="small" :loading="isRetrying && retryingMessageId === message.id" @click="handleRetry(message)">
+                <el-icon class="mr-1"><RefreshRight /></el-icon>
+                重试
+              </el-button>
+              <div v-if="message.stages" class="mt-1 text-xs text-red-500">
+                <template v-for="(stage, key) in message.stages" :key="key">
+                  <span v-if="stage.status === 'error'" class="mr-2">
+                    {{ stageNameMap[key as keyof typeof stageNameMap] || key }}: {{ stage.error }}
+                  </span>
+                </template>
+              </div>
+            </div>
             <div class="text-xs text-gray-400 mt-1">{{ formatTime(message.timestamp) }}</div>
           </div>
         </div>
@@ -113,13 +126,13 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
-import { DArrowRight, Loading, Document } from '@element-plus/icons-vue'
+import { DArrowRight, Loading, Document, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useChatStore } from '@/stores/chat'
 import { useProjectStore } from '@/stores/project'
 import { generateInitial, generateIterate, type ApiFile, type Attachment, API_BASE } from '@/api'
 import { buildProjectFiles } from '@/templates/project-template'
-import type { ProjectFile } from '@/types'
+import type { ProjectFile, ChatMessage } from '@/types'
 
 const props = defineProps<{
   historyCollapsed?: boolean
@@ -137,7 +150,15 @@ const inputMessage = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const pendingUserMessage = ref('')
 const currentAttachments = ref<Attachment[]>([])
+const isRetrying = ref(false)
+const retryingMessageId = ref<string | null>(null)
 
+const stageNameMap: Record<string, string> = {
+  attachment: '附件处理',
+  requirement: '需求标准化',
+  generation: '代码生成',
+  optimization: 'UX优化',
+}
 const currentSession = computed(() => chatStore.currentSession)
 const isLoading = computed(() => chatStore.isLoading)
 
@@ -243,14 +264,79 @@ async function sendMessage() {
     projectStore.setFiles(projectFiles)
     chatStore.updateSessionFiles(sessionId!, userFiles)
     
-    await chatStore.addMessageRemote(sessionId!, { role: 'assistant', content: result.message })
+    await chatStore.loadSession(sessionId!)
 
-    ElMessage.success('生成成功')
+    if ('failedStep' in result && result.failedStep != null) {
+      ElMessage.warning('生成失败，请点击重试按钮重试')
+    } else {
+      ElMessage.success('生成成功')
+    }
   } catch (error) {
     ElMessage.error('生成失败: ' + (error as Error).message)
   } finally {
     chatStore.setLoading(false)
     pendingUserMessage.value = ''
+    scrollToBottom()
+    emit('generated')
+  }
+}
+
+async function handleRetry(message: ChatMessage) {
+  if (!currentSession.value || message.failedStep == null || isRetrying.value) return
+
+  const sessionId = chatStore.currentSessionId!
+  const firstUserMessage = currentSession.value.messages.find(m => m.role === 'user')
+  if (!firstUserMessage) return
+
+  isRetrying.value = true
+  retryingMessageId.value = message.id
+  chatStore.setLoading(true)
+
+  try {
+    const result = await generateInitial({
+      prompt: firstUserMessage.content,
+      sessionId,
+      componentLib: currentSession.value.componentLib,
+      fromStep: message.failedStep,
+    })
+
+    const SYSTEM_FILE_PATHS = new Set([
+      '/src/main.ts',
+      '/src/App.vue',
+      '/src/style.css',
+      '/public/index.html',
+      '/package.json',
+      '/vite.config.ts',
+    ])
+
+    const userFiles = result.files?.filter(f => !SYSTEM_FILE_PATHS.has(f.path)) || []
+
+    const mainPageContent = userFiles[0]?.content || ''
+    const extraFiles: ProjectFile[] = userFiles.slice(1).map((f) => ({
+      id: f.id,
+      name: f.name,
+      path: f.path,
+      type: f.type as 'file',
+      language: f.language as ProjectFile['language'],
+      content: f.content,
+    }))
+    const projectFiles = buildProjectFiles(mainPageContent, extraFiles, currentSession.value?.componentLib)
+    projectStore.setFiles(projectFiles)
+    chatStore.updateSessionFiles(sessionId, userFiles)
+
+    await chatStore.loadSession(sessionId)
+
+    if (result.failedStep != null) {
+      ElMessage.warning('重试仍然失败，请再次点击重试')
+    } else {
+      ElMessage.success('重试成功')
+    }
+  } catch (error) {
+    ElMessage.error('重试失败: ' + (error as Error).message)
+  } finally {
+    isRetrying.value = false
+    retryingMessageId.value = null
+    chatStore.setLoading(false)
     scrollToBottom()
     emit('generated')
   }
