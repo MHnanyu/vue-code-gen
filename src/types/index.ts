@@ -9,7 +9,7 @@ export interface Attachment {
 }
 
 export interface StageInfo {
-  status: 'success' | 'skipped' | 'error'
+  status: 'success' | 'skipped' | 'error' | 'failed'
   duration: number | null
   output: string | null
   error: string | null

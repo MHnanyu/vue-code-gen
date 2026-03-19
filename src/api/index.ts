@@ -104,22 +104,10 @@ interface GenerateIterateRequest {
   files: ApiFile[]
 }
 
-interface StageInfo {
-  status: 'success' | 'skipped' | 'error'
-  duration: number | null
-  output: string | null
-  error: string | null
-}
-
 interface GenerateInitialResponse {
   files: ApiFile[]
   message: string
-  stages?: {
-    attachment?: StageInfo
-    requirement?: StageInfo
-    generation?: StageInfo
-    optimization?: StageInfo
-  }
+  stages?: Stages
   failedStep?: number | null
 }
 

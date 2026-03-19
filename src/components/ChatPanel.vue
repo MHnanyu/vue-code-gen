@@ -39,30 +39,32 @@
               class="px-4 py-3 rounded-xl leading-relaxed break-words"
               :class="message.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-100'"
             >
-              <div v-if="message.attachments?.length" class="flex flex-wrap gap-2 mb-2">
+              <div v-if="message.attachments?.length" class="flex flex-wrap gap-2 mb-2 items-center">
                 <template v-for="att in message.attachments" :key="att.id">
                   <el-popover v-if="att.type === 'image'" placement="top" :width="300" trigger="hover">
                     <template #reference>
-                      <img :src="`${API_BASE}${att.url}`" class="w-16 h-16 rounded-lg object-cover cursor-pointer border-2 border-white/30" />
+                      <img :src="`${API_BASE}${att.url}`" class="w-16 h-16 rounded-lg object-cover cursor-pointer border-2 border-white/30 shrink-0" />
                     </template>
                     <img :src="`${API_BASE}${att.url}`" class="w-full rounded" />
                   </el-popover>
-                  <div v-else class="flex items-center gap-1 px-2 py-1 rounded bg-blue-400 text-white text-xs">
-                    <el-icon><Document /></el-icon>
-                    <span class="max-w-[80px] truncate">{{ att.name }}</span>
-                  </div>
+                  <el-tooltip v-else :content="att.name" placement="top" :show-after="300">
+                    <div class="flex items-center gap-1 w-16 h-16 rounded-lg bg-blue-400 text-white text-xs shrink-0 flex-col justify-center cursor-default">
+                      <el-icon :size="20"><Document /></el-icon>
+                      <span class="w-full text-center truncate px-1">{{ att.name }}</span>
+                    </div>
+                  </el-tooltip>
                 </template>
               </div>
               {{ message.content }}
             </div>
-            <div v-if="message.failedStep != null" class="mt-2">
+            <div v-if="message.failedStep != null && lastAssistantMessageId === message.id" class="mt-2">
               <el-button type="warning" size="small" :loading="isRetrying && retryingMessageId === message.id" @click="handleRetry(message)">
                 <el-icon class="mr-1"><RefreshRight /></el-icon>
                 重试
               </el-button>
               <div v-if="message.stages" class="mt-1 text-xs text-red-500">
                 <template v-for="(stage, key) in message.stages" :key="key">
-                  <span v-if="stage.status === 'error'" class="mr-2">
+                  <span v-if="stage.status === 'error' || stage.status === 'failed'" class="mr-2">
                     {{ stageNameMap[key as keyof typeof stageNameMap] || key }}: {{ stage.error }}
                   </span>
                 </template>
@@ -152,6 +154,16 @@ const pendingUserMessage = ref('')
 const currentAttachments = ref<Attachment[]>([])
 const isRetrying = ref(false)
 const retryingMessageId = ref<string | null>(null)
+
+const lastAssistantMessageId = computed(() => {
+  const msgs = currentSession.value?.messages || []
+  for (let i = msgs.length - 1; i >= 0; i--) {
+    if (msgs[i].role === 'assistant') {
+      return msgs[i].id
+    }
+  }
+  return null
+})
 
 const stageNameMap: Record<string, string> = {
   attachment: '附件处理',
