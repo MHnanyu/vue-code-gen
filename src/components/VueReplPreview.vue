@@ -50,7 +50,7 @@ import { Repl, useStore, useVueImportMap } from '@vue/repl'
 import CodeMirror from '@vue/repl/codemirror-editor'
 import { collectAllFiles } from '@/preview/resolver'
 import type { ProjectFile } from '@/types'
-import ccuiTokensCss from '@/ccui/theme/tokens.css?raw'
+
 
 const props = withDefaults(defineProps<{
   files: ProjectFile[]
@@ -91,7 +91,6 @@ const previewOptions = {
     <link rel="stylesheet" href="https://unpkg.com/element-plus@2.4.4/dist/index.css">
     <script src="https://cdn.tailwindcss.com"><\/script>
     <style>
-      ${ccuiTokensCss}
       blockquote {
         border-left: 4px solid #e5e7eb;
         padding-left: 1rem;

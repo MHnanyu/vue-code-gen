@@ -86,12 +86,6 @@ import TypographyTitle from '../ccui/components/Typography/Title.vue?raw'
 import UploadIndex from '../ccui/components/Upload/index.vue?raw'
 import VirtualizedSelectIndex from '../ccui/components/VirtualizedSelect/index.vue?raw'
 
-import TokensCss from '../ccui/theme/tokens.css?raw'
-
-export const CCUI_THEME_FILES: { path: string; name: string; content: string }[] = [
-  { path: 'ccui/theme/tokens.css', name: 'tokens.css', content: TokensCss },
-]
-
 export const CCUI_COMPONENT_FILES: { path: string; name: string; content: string }[] = [
   { path: 'ccui/Affix.vue', name: 'Affix.vue', content: AffixIndex },
   { path: 'ccui/Anchor.vue', name: 'Anchor.vue', content: AnchorIndex },
@@ -200,22 +194,4 @@ export function getCcuiComponentsAsProjectFiles(): ProjectFile[] {
   return [ccuiFolder]
 }
 
-export function getCcuiThemeAsProjectFiles(): ProjectFile[] {
-  const themeFolder: ProjectFile = {
-    id: 'ccui-theme-folder',
-    name: 'theme',
-    path: '/src/ccui/theme',
-    type: 'folder',
-    children: CCUI_THEME_FILES.map((file, index) => ({
-      id: `ccui-theme-${index}`,
-      name: file.name,
-      path: `/src/${file.path}`,
-      type: 'file' as const,
-      language: 'css' as const,
-      content: file.content,
-      readonly: true,
-    })),
-  }
 
-  return [themeFolder]
-}

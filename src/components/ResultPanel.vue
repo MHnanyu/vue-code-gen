@@ -106,7 +106,7 @@ import { useChatStore } from '@/stores/chat'
 import { updateSessionFiles, type ApiFile } from '@/api'
 import { collectAllFiles } from '@/preview/resolver'
 import { getBaseProjectFiles, getMainTs } from '@/templates/project-template'
-import { getCcuiComponentsAsProjectFiles, getCcuiThemeAsProjectFiles } from '@/templates/ccui-components'
+import { getCcuiComponentsAsProjectFiles } from '@/templates/ccui-components'
 import FileTree from '@/components/FileTree.vue'
 import MonacoEditor from '@/components/MonacoEditor.vue'
 import VueReplPreview from '@/components/VueReplPreview.vue'
@@ -246,7 +246,6 @@ async function exportProject() {
   if (componentLib === 'ccui') {
     const ccuiFolder = srcFolder.folder('ccui')
     const ccuiComponents = getCcuiComponentsAsProjectFiles()
-    const ccuiTheme = getCcuiThemeAsProjectFiles()
 
     function addCcuiFiles(files: ProjectFile[], parentFolder: JSZip) {
       for (const file of files) {
@@ -262,7 +261,6 @@ async function exportProject() {
     }
 
     addCcuiFiles(ccuiComponents, ccuiFolder!)
-    addCcuiFiles(ccuiTheme, ccuiFolder!)
   }
 
   const allFiles = collectAllFiles(projectStore.files)
