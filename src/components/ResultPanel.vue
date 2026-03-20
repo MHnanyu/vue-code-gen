@@ -285,33 +285,36 @@ async function ensureStageContentLoaded(key: string) {
 
   const isDeduplicatedKey = /_\d+$/.test(key)
 
-  if (!isDeduplicatedKey) {
-    const preview = chatStore.stagePreviewMap.get(stageName)
-    if (preview?.filePath) {
-      fetchPath = preview.filePath
-      outputType = preview.type
+  const session = chatStore.currentSession
+  if (session) {
+    const allOutputs = session.messages.flatMap(m => m.stageOutputs || [])
+    if (isDeduplicatedKey) {
+      const idx = parseInt(key.split('_').pop()!) - 1
+      const sameNameOutputs = allOutputs.filter(o => o.stageName === stageName)
+      const output = sameNameOutputs[idx]
+      if (output) {
+        // 对于 vue 类型，使用 filePath（JSON文件），因为它包含文件列表
+        // 对于 markdown 类型，也使用 filePath
+        fetchPath = output.filePath
+        outputType = output.outputType
+      }
+    } else {
+      const output = allOutputs.findLast(o => o.stageName === stageName)
+      if (output) {
+        fetchPath = output.filePath
+        outputType = output.outputType
+      }
     }
   }
 
-  if (!fetchPath) {
-    const session = chatStore.currentSession
-    if (session) {
-      const allOutputs = session.messages.flatMap(m => m.stageOutputs || [])
-      if (isDeduplicatedKey) {
-        const idx = parseInt(key.split('_').pop()!) - 1
-        const sameNameOutputs = allOutputs.filter(o => o.stageName === stageName)
-        const output = sameNameOutputs[idx]
-        if (output) {
-          fetchPath = output.filePath || output.vueDirPath
-          outputType = output.outputType
-        }
-      } else {
-        const output = allOutputs.findLast(o => o.stageName === stageName)
-        if (output) {
-          fetchPath = output.filePath || output.vueDirPath
-          outputType = output.outputType
-        }
-      }
+  // 如果 stageOutputs 中没有，尝试从 stagePreviewMap 获取
+  // 注意：stagePreviewMap 中的 filePath 可能是 vueDirPath（目录），
+  // 所以仅作为后备方案，且只用于 markdown 类型
+  if (!fetchPath && !isDeduplicatedKey) {
+    const preview = chatStore.stagePreviewMap.get(stageName)
+    if (preview?.filePath && preview.type === 'markdown') {
+      fetchPath = preview.filePath
+      outputType = preview.type
     }
   }
 

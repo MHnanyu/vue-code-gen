@@ -82,6 +82,7 @@ const replStore = useStore({
       ...vueImportMap.value.imports,
       'element-plus': 'https://unpkg.com/element-plus@2.4.4/dist/index.full.mjs',
       '@element-plus/icons-vue': 'https://unpkg.com/@element-plus/icons-vue@2.3.1/dist/index.js',
+      'echarts': 'https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.esm.min.js',
     },
   })),
 })
@@ -131,6 +132,10 @@ function normalizeImports(content: string, filename: string): string {
   }
 
   result = result
+    .replace(/^import\s+\*\s+as\s+echarts\s+from\s+['"]echarts['"]\s*;?\s*$/gm,
+      `import * as _ec from 'echarts'; const echarts = {..._ec, init(...a){ const c=_ec.init(...a); requestAnimationFrame(()=>c.resize()); return c }}`)
+    .replace(/^import\s+echarts\s+from\s+['"]echarts['"]\s*;?\s*$/gm,
+      `import * as _ec from 'echarts'; const echarts = {..._ec, init(...a){ const c=_ec.init(...a); requestAnimationFrame(()=>c.resize()); return c }}`)
     .replace(/^import\s+['"][^'"]+\.css['"]\s*;?\s*$/gm, '')
     .replace(/(['"])@\/(?:[^'"]*\/)?([^/'"]+)\1/g, '$1./$2$1')
     .replace(/(['"])\.\.?\/(?:[^'"]*\/)?([^/'"]+\.(vue|ts|tsx|js|jsx))\1/g, '$1./$2$1')
