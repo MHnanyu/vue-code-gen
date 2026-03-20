@@ -46,6 +46,16 @@ interface ApiMessage {
   attachments?: Attachment[]
   failedStep?: number | null
   stages?: Stages | null
+  stageOutputs?: Array<{
+    stage: number
+    stageName: string
+    status: 'success' | 'failed' | 'skipped' | 'cached'
+    duration: number | null
+    outputType: 'markdown' | 'json' | 'vue' | null
+    filePath: string | null
+    vueDirPath: string | null
+    error: string | null
+  }> | null
 }
 
 interface CreateSessionRequest {
@@ -196,6 +206,7 @@ export function transformApiSession(session: ApiSession) {
       attachments: msg.attachments,
       failedStep: msg.failedStep,
       stages: msg.stages,
+      stageOutputs: msg.stageOutputs,
     })),
     files: session.files,
     componentLib: session.componentLib,
@@ -241,4 +252,50 @@ export async function uploadFiles(files: File[]): Promise<UploadResponse> {
   }
 
   return result.data
+}
+
+import { fetchSSEStream, type SSECallbacks } from './sse'
+
+export type { SSECallbacks }
+
+export function generateInitialStream(
+  params: GenerateInitialRequest,
+  callbacks: SSECallbacks,
+  signal?: AbortSignal,
+): Promise<void> {
+  return fetchSSEStream(
+    '/api/generate/initial/stream',
+    params as unknown as Record<string, unknown>,
+    callbacks,
+    signal,
+  )
+}
+
+export function generateIterateStream(
+  params: GenerateIterateRequest,
+  callbacks: SSECallbacks,
+  signal?: AbortSignal,
+): Promise<void> {
+  return fetchSSEStream(
+    '/api/generate/iterate/stream',
+    params as unknown as Record<string, unknown>,
+    callbacks,
+    signal,
+  )
+}
+
+export async function fetchStageFile(filePath: string): Promise<string> {
+  const response = await fetch(`${API_BASE}/${filePath}`)
+  if (!response.ok) {
+    throw new Error(`Failed to fetch stage file: ${response.status}`)
+  }
+  return response.text()
+}
+
+export async function fetchStageJson<T = unknown>(filePath: string): Promise<T> {
+  const response = await fetch(`${API_BASE}/${filePath}`)
+  if (!response.ok) {
+    throw new Error(`Failed to fetch stage JSON: ${response.status}`)
+  }
+  return response.json()
 }

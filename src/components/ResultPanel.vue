@@ -1,6 +1,6 @@
 <template>
   <div class="h-full flex flex-col bg-white">
-    <div v-if="!hasFiles" class="flex-1 flex items-center justify-center">
+    <div v-if="!hasFiles && !hasStageContent" class="flex-1 flex items-center justify-center">
       <el-empty description="生成代码后显示预览" :image-size="80">
         <template #image>
           <span class="text-5xl">🎨</span>
@@ -12,8 +12,9 @@
         <el-tabs v-model="activeTab" class="result-tabs">
           <el-tab-pane label="Preview" name="preview" />
           <el-tab-pane label="Code" name="code" />
+          <el-tab-pane v-if="hasStageContent" label="步骤产物" name="stages" />
         </el-tabs>
-        <div class="toolbar-actions">
+        <div v-if="activeTab !== 'stages'" class="toolbar-actions">
           <div class="tech-tags">
             <el-tag type="success" effect="plain" size="small">Vue3</el-tag>
             <el-tag effect="plain" size="small">{{ componentLibLabel }}</el-tag>
@@ -66,7 +67,7 @@
         loading-text="加载预览中..."
       />
       
-      <div v-else class="code-editor-wrapper flex-1 flex">
+      <div v-else-if="activeTab === 'code'" class="code-editor-wrapper flex-1 flex">
         <div class="file-tree-panel">
           <FileTree
             :files="projectStore.files"
@@ -92,26 +93,167 @@
           <el-empty v-else description="选择文件进行编辑" :image-size="60" />
         </div>
       </div>
+
+      <div v-else-if="activeTab === 'stages'" class="stage-output-panel flex-1">
+        <el-tabs v-model="activeStageKey" type="border-card" class="stage-tabs">
+          <el-tab-pane
+            v-for="stage in completedStages"
+            :key="stage._key"
+            :label="stage._label"
+            :name="stage._key"
+          >
+            <div class="stage-content">
+              <MarkdownPreview
+                v-if="getStageOutputType(stage.stageName) === 'markdown'"
+                :content="getStageMarkdownContent(stage._key)"
+                :loading="stage.status === 'running'"
+              />
+              <VueReplPreview
+                v-else-if="getStageOutputType(stage.stageName) === 'vue' && getStageVueFiles(stage._key)"
+                class="stage-repl"
+                :files="buildProjectFilesFromStage(getStageVueFiles(stage._key)!)"
+                :show-toolbar="false"
+                empty-text="暂无 Vue 产物"
+                empty-icon="📄"
+              />
+              <el-empty v-else description="该步骤无可用预览" :image-size="60" />
+            </div>
+          </el-tab-pane>
+        </el-tabs>
+      </div>
     </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { FullScreen } from '@element-plus/icons-vue'
 import { useProjectStore } from '@/stores/project'
 import { useChatStore } from '@/stores/chat'
-import { updateSessionFiles, type ApiFile } from '@/api'
+import { updateSessionFiles, fetchStageFile, fetchStageJson, type ApiFile } from '@/api'
 import { collectAllFiles } from '@/preview/resolver'
-import { getBaseProjectFiles, getMainTs } from '@/templates/project-template'
+import { getBaseProjectFiles, getMainTs, buildProjectFiles } from '@/templates/project-template'
 import { getCcuiComponentsAsProjectFiles } from '@/templates/ccui-components'
 import FileTree from '@/components/FileTree.vue'
 import MonacoEditor from '@/components/MonacoEditor.vue'
 import VueReplPreview from '@/components/VueReplPreview.vue'
+import MarkdownPreview from '@/components/MarkdownPreview.vue'
 import type { ProjectFile, ComponentLib } from '@/types'
 import JSZip from 'jszip'
+
+const STAGE_NAME_MAP: Record<string, string> = {
+  attachment: '附件处理',
+  requirement: '需求标准化',
+  generation: '代码生成',
+  optimization: 'UX 优化',
+  iteration: '迭代修改',
+}
+
+const router = useRouter()
+const projectStore = useProjectStore()
+const chatStore = useChatStore()
+const activeTab = ref('preview')
+const activeStageKey = ref('')
+const isSaving = ref(false)
+const replPreviewRef = ref<InstanceType<typeof VueReplPreview> | null>(null)
+const hasFiles = computed(() => projectStore.files.length > 0)
+const selectedFile = computed(() => projectStore.selectedFile)
+
+interface CompletedStage {
+  _key: string
+  _label: string
+  stage: number
+  stageName: string
+  status: string
+  duration: number | null
+}
+
+const completedStages = computed<CompletedStage[]>(() => {
+  const result: CompletedStage[] = []
+
+  const session = chatStore.currentSession
+  const allOutputs = session ? session.messages.flatMap(m => m.stageOutputs || []) : []
+
+  const nameCount = new Map<string, number>()
+  for (const output of allOutputs) {
+    nameCount.set(output.stageName, (nameCount.get(output.stageName) || 0) + 1)
+  }
+
+  const usedKeys = new Set<string>()
+  const nameIndex = new Map<string, number>()
+  for (const output of allOutputs) {
+    nameIndex.set(output.stageName, (nameIndex.get(output.stageName) || 0) + 1)
+    const count = nameCount.get(output.stageName)!
+    const idx = nameIndex.get(output.stageName)!
+    const baseName = STAGE_NAME_MAP[output.stageName] || output.stageName
+    const key = count > 1 ? `${output.stageName}_${idx}` : output.stageName
+    const label = count > 1 ? `${baseName} #${idx}` : baseName
+    usedKeys.add(key)
+    result.push({
+      _key: key,
+      _label: label,
+      stage: output.stage,
+      stageName: output.stageName,
+      status: output.status,
+      duration: output.duration,
+    })
+  }
+
+  const fromProgress = chatStore.stageProgresses.filter(s => s.status !== 'pending')
+  const existingProgressNames = new Set<string>()
+  for (const s of fromProgress) {
+    const baseName = STAGE_NAME_MAP[s.stageName] || s.stageName
+    let key = s.stageName
+    let label = baseName
+    if (usedKeys.has(key)) {
+      const count = nameCount.get(s.stageName) || 0
+      const idx = count + 1
+      key = `${s.stageName}_${idx}`
+      label = `${baseName} #${idx}`
+      nameCount.set(s.stageName, idx)
+    }
+    usedKeys.add(key)
+    existingProgressNames.add(s.stageName)
+    result.push({
+      _key: key,
+      _label: label,
+      stage: s.stage,
+      stageName: s.stageName,
+      status: s.status,
+      duration: s.duration,
+    })
+  }
+
+  for (const [name, preview] of chatStore.stagePreviewMap) {
+    if (!existingProgressNames.has(name) && preview.type) {
+      if (!usedKeys.has(name)) {
+        usedKeys.add(name)
+        result.push({
+          _key: name,
+          _label: STAGE_NAME_MAP[name] || name,
+          stage: -1,
+          stageName: name,
+          status: 'success',
+          duration: null,
+        })
+      }
+    }
+  }
+
+  return result
+})
+
+const hasStageContent = computed(() => {
+  return chatStore.isStreaming || completedStages.value.length > 0 || chatStore.hasStageOutputs || stageContentCache.value.size > 0
+})
+
+const componentLibLabel = computed(() => {
+  const session = chatStore.currentSession
+  const lib = session?.componentLib || 'ElementUI'
+  return COMPONENT_LIB_LABELS[lib] || 'ElementUI'
+})
 
 const COMPONENT_LIB_LABELS: Record<ComponentLib, string> = {
   ElementUI: 'ElementUI',
@@ -119,20 +261,156 @@ const COMPONENT_LIB_LABELS: Record<ComponentLib, string> = {
   ccui: 'CcUI',
 }
 
-const router = useRouter()
-const projectStore = useProjectStore()
-const chatStore = useChatStore()
-const activeTab = ref('preview')
-const isSaving = ref(false)
-const replPreviewRef = ref<InstanceType<typeof VueReplPreview> | null>(null)
-const hasFiles = computed(() => projectStore.files.length > 0)
-const selectedFile = computed(() => projectStore.selectedFile)
+const stageContentCache = ref<Map<string, { type: 'markdown' | 'vue' | null; content: string | null; files: ApiFile[] | null }>>(new Map())
+const stageLoadingMap = ref<Map<string, boolean>>(new Map())
 
-const componentLibLabel = computed(() => {
-  const session = chatStore.currentSession
-  const lib = session?.componentLib || 'ElementUI'
-  return COMPONENT_LIB_LABELS[lib] || 'ElementUI'
+watch(() => chatStore.activeStageTab, async (key) => {
+  if (key !== null && hasStageContent.value) {
+    let target = completedStages.value.find(s => s._key === key)
+    if (!target) {
+      target = completedStages.value.findLast(s => s.stageName === key)
+    }
+    if (target) {
+      activeTab.value = 'stages'
+      activeStageKey.value = target._key
+      await ensureStageContentLoaded(target._key)
+    }
+  }
 })
+
+async function ensureStageContentLoaded(key: string) {
+  if (stageContentCache.value.has(key)) return
+  if (stageLoadingMap.value.get(key)) return
+
+  const stage = completedStages.value.find(s => s._key === key)
+  const stageName = stage?.stageName || key.replace(/_\d+$/, '')
+  if (!stageName) return
+
+  let fetchPath: string | null = null
+  let outputType: string | null = null
+
+  const isDeduplicatedKey = /_\d+$/.test(key)
+
+  if (!isDeduplicatedKey) {
+    const preview = chatStore.stagePreviewMap.get(stageName)
+    if (preview?.filePath) {
+      fetchPath = preview.filePath
+      outputType = preview.type
+    }
+  }
+
+  if (!fetchPath) {
+    const session = chatStore.currentSession
+    if (session) {
+      const allOutputs = session.messages.flatMap(m => m.stageOutputs || [])
+      if (isDeduplicatedKey) {
+        const idx = parseInt(key.split('_').pop()!) - 1
+        const sameNameOutputs = allOutputs.filter(o => o.stageName === stageName)
+        const output = sameNameOutputs[idx]
+        if (output) {
+          fetchPath = output.filePath || output.vueDirPath
+          outputType = output.outputType
+        }
+      } else {
+        const output = allOutputs.findLast(o => o.stageName === stageName)
+        if (output) {
+          fetchPath = output.filePath || output.vueDirPath
+          outputType = output.outputType
+        }
+      }
+    }
+  }
+
+  if (!fetchPath || !outputType) return
+
+  stageLoadingMap.value.set(key, true)
+  try {
+    if (outputType === 'markdown') {
+      const content = await fetchStageFile(fetchPath)
+      stageContentCache.value.set(key, { type: 'markdown', content, files: null })
+    } else if (outputType === 'vue' || outputType === 'json') {
+      const raw = await fetchStageJson<ApiFile[] | { data?: ApiFile[]; files?: ApiFile[] }>(fetchPath)
+      const data = Array.isArray(raw) ? raw : (raw.data || raw.files || [])
+      stageContentCache.value.set(key, { type: 'vue', content: null, files: data })
+    }
+  } catch {
+    console.warn('Failed to load stage artifact for', key)
+  } finally {
+    stageLoadingMap.value.set(key, false)
+  }
+}
+
+watch(() => activeStageKey.value, async (key) => {
+  if (key) {
+    await ensureStageContentLoaded(key)
+  }
+})
+
+watch(() => chatStore.hasStageOutputs, async (has) => {
+  if (has && activeStageKey.value) {
+    stageContentCache.value.clear()
+    await ensureStageContentLoaded(activeStageKey.value)
+  }
+})
+
+function getStageOutputType(stageName: string): 'markdown' | 'vue' | null {
+  if (stageName === 'attachment' || stageName === 'requirement') return 'markdown'
+  if (stageName === 'generation' || stageName === 'optimization' || stageName === 'iteration') return 'vue'
+  return null
+}
+
+function getStageMarkdownContent(key: string): string | null {
+  const cached = stageContentCache.value.get(key)
+  if (cached?.type === 'markdown' && cached.content) {
+    return cached.content
+  }
+
+  const stageName = completedStages.value.find(s => s._key === key)?.stageName
+  if (!stageName) return null
+
+  const preview = chatStore.stagePreviewMap.get(stageName)
+  if (preview?.type === 'markdown' && preview.content) {
+    return preview.content
+  }
+
+  return null
+}
+
+function getStageVueFiles(key: string): ApiFile[] | null {
+  const cached = stageContentCache.value.get(key)
+  if (cached?.type === 'vue' && cached.files) {
+    return cached.files
+  }
+
+  const stageName = completedStages.value.find(s => s._key === key)?.stageName
+  if (!stageName) return null
+
+  const preview = chatStore.stagePreviewMap.get(stageName)
+  if (preview?.type === 'vue' && preview.files) {
+    return preview.files
+  }
+
+  return null
+}
+
+function buildProjectFilesFromStage(files: ApiFile[]): ProjectFile[] {
+  const mainFile = files.find(f => f.name === 'MainPage.vue')
+  const extraFiles = files.filter(f => f.name !== 'MainPage.vue')
+  return buildProjectFiles(
+    mainFile?.content || '',
+    extraFiles.length > 0
+      ? extraFiles.map(f => ({
+          id: f.id,
+          name: f.name,
+          path: f.path,
+          type: f.type as 'file',
+          language: f.language as ProjectFile['language'],
+          content: f.content,
+        }))
+      : undefined,
+    chatStore.currentSession?.componentLib,
+  )
+}
 
 function collectEditableApiFiles(): ApiFile[] {
   const result: ApiFile[] = []
@@ -338,6 +616,67 @@ async function exportProject() {
   border-right: 1px solid #e4e7ed;
 }
 
+.stage-output-panel {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.stage-tabs {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.stage-tabs :deep(.el-tabs__content) {
+  flex: 1;
+  overflow: hidden;
+}
+
+.stage-tabs :deep(.el-tab-pane) {
+  height: 100%;
+}
+
+.stage-content {
+  height: 100%;
+  overflow: hidden;
+}
+
+.stage-repl {
+  height: 100%;
+}
+
+.code-editor-wrapper {
+  overflow: hidden;
+}
+
+.file-tree-panel {
+  width: 200px;
+  flex-shrink: 0;
+  border-right: 1px solid #e4e7ed;
+  overflow-y: auto;
+}
+
+.editor-panel {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.editor-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: #fff;
+  border-bottom: 1px solid #e4e7ed;
+  font-size: 13px;
+}
+
+.editor-panel :deep(.monaco-editor-container) {
+  flex: 1;
+}
+
 .repl-wrapper {
   overflow: hidden;
   position: relative;
@@ -378,36 +717,5 @@ async function exportProject() {
 
 .repl-wrapper.preview :deep(.output-container) {
   height: 100% !important;
-}
-
-.code-editor-wrapper {
-  overflow: hidden;
-}
-
-.file-tree-panel {
-  width: 200px;
-  flex-shrink: 0;
-  border-right: 1px solid #e4e7ed;
-  overflow-y: auto;
-}
-
-.editor-panel {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.editor-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: #fff;
-  border-bottom: 1px solid #e4e7ed;
-  font-size: 13px;
-}
-
-.editor-panel :deep(.monaco-editor-container) {
-  flex: 1;
 }
 </style>

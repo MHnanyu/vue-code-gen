@@ -57,15 +57,30 @@
               </div>
               {{ message.content }}
             </div>
-            <div v-if="message.failedStep != null && lastAssistantMessageId === message.id" class="mt-2">
+            <div v-if="message.stageOutputs?.length && message.role === 'assistant'" class="mt-2">
+              <div class="stage-summary">
+                <el-tag
+                  v-for="output in message.stageOutputs"
+                  :key="output.stage"
+                  :type="output.status === 'success' || output.status === 'cached' ? 'success' : output.status === 'failed' ? 'danger' : 'info'"
+                  size="small"
+                  class="stage-tag"
+                  @click="handleViewStageOutput(message, output)"
+                >
+                  {{ stageNameMap[output.stageName] || output.stageName }}
+                  ({{ output.duration != null ? output.duration.toFixed(1) + 's' : '--' }})
+                </el-tag>
+              </div>
+            </div>
+            <div v-if="message.failedStep != null && lastAssistantMessageId === message.id && !message.stageOutputs?.length" class="mt-2">
               <el-button type="warning" size="small" :loading="isRetrying && retryingMessageId === message.id" @click="handleRetry(message)">
                 <el-icon class="mr-1"><RefreshRight /></el-icon>
                 重试
               </el-button>
               <div v-if="message.stages" class="mt-1 text-xs text-red-500">
                 <template v-for="(stage, key) in message.stages" :key="key">
-                  <span v-if="stage.status === 'error' || stage.status === 'failed'" class="mr-2">
-                    {{ stageNameMap[key as keyof typeof stageNameMap] || key }}: {{ stage.error }}
+                  <span v-if="stage?.status === 'error' || stage?.status === 'failed'" class="mr-2">
+                    {{ stageNameMap[key as keyof typeof stageNameMap] || key }}: {{ stage?.error }}
                   </span>
                 </template>
               </div>
@@ -73,7 +88,18 @@
             <div class="text-xs text-gray-400 mt-1">{{ formatTime(message.timestamp) }}</div>
           </div>
         </div>
-        <div v-if="isLoading" class="flex gap-3 mb-5">
+
+        <div v-if="chatStore.isStreaming || chatStore.stageProgresses.length > 0" class="mb-5">
+          <StageProgress
+            :stages="chatStore.stageProgresses"
+            :is-streaming="chatStore.isStreaming"
+            :on-retry="handleRetryFromStage"
+            :on-cancel="chatStore.cancelStreaming"
+            @stage-click="handleStageClick"
+          />
+        </div>
+
+        <div v-else-if="isLoading && !chatStore.isStreaming" class="flex gap-3 mb-5">
           <div class="flex-shrink-0">
             <el-avatar :size="32" style="background: #67c23a">AI</el-avatar>
           </div>
@@ -90,7 +116,16 @@
           </div>
           <div class="px-4 py-3 rounded-xl bg-blue-500 text-white">{{ pendingUserMessage }}</div>
         </div>
-        <div class="flex gap-3">
+        <div v-if="chatStore.isStreaming || chatStore.stageProgresses.length > 0">
+          <StageProgress
+            :stages="chatStore.stageProgresses"
+            :is-streaming="chatStore.isStreaming"
+            :on-retry="handleRetryFromStage"
+            :on-cancel="chatStore.cancelStreaming"
+            @stage-click="handleStageClick"
+          />
+        </div>
+        <div v-else class="flex gap-3">
           <div class="flex-shrink-0">
             <el-avatar :size="32" style="background: #67c23a">AI</el-avatar>
           </div>
@@ -118,7 +153,7 @@
       />
       <div class="flex justify-between items-center mt-3">
         <span class="text-xs text-gray-400">Ctrl + Enter 发送</span>
-        <el-button type="primary" :loading="isLoading" :disabled="!inputMessage.trim()" @click="sendMessage">
+        <el-button type="primary" :loading="isLoading" :disabled="!inputMessage.trim() || chatStore.isStreaming" @click="sendMessage">
           发送
         </el-button>
       </div>
@@ -127,14 +162,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import { DArrowRight, Loading, Document, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useChatStore } from '@/stores/chat'
 import { useProjectStore } from '@/stores/project'
-import { generateInitial, generateIterate, type ApiFile, type Attachment, API_BASE } from '@/api'
+import { generateInitialStream, generateIterateStream, type ApiFile, type Attachment, type SSECallbacks, API_BASE } from '@/api'
 import { buildProjectFiles } from '@/templates/project-template'
-import type { ProjectFile, ChatMessage } from '@/types'
+import type { ProjectFile, ChatMessage, StageOutput, StageProgressState } from '@/types'
+import StageProgress from '@/components/StageProgress.vue'
 
 const props = defineProps<{
   historyCollapsed?: boolean
@@ -170,6 +206,7 @@ const stageNameMap: Record<string, string> = {
   requirement: '需求标准化',
   generation: '代码生成',
   optimization: 'UX优化',
+  iteration: '迭代修改',
 }
 const currentSession = computed(() => chatStore.currentSession)
 const isLoading = computed(() => chatStore.isLoading)
@@ -179,6 +216,34 @@ const placeholder = computed(() =>
     ? '继续描述您的需求，或提出修改建议...'
     : '输入您的需求，开始生成代码...'
 )
+
+const SYSTEM_FILE_PATHS = new Set([
+  '/src/main.ts',
+  '/src/App.vue',
+  '/src/style.css',
+  '/public/index.html',
+  '/package.json',
+  '/vite.config.ts',
+])
+
+function filterSystemFiles(files: ApiFile[]): ApiFile[] {
+  return files.filter(f => !SYSTEM_FILE_PATHS.has(f.path))
+}
+
+function processFilesToProject(files: ApiFile[], componentLib?: string): void {
+  const userFiles = filterSystemFiles(files)
+  const mainPageContent = userFiles[0]?.content || ''
+  const extraFiles: ProjectFile[] = userFiles.slice(1).map((f) => ({
+    id: f.id,
+    name: f.name,
+    path: f.path,
+    type: f.type as 'file',
+    language: f.language as ProjectFile['language'],
+    content: f.content,
+  }))
+  const projectFiles = buildProjectFiles(mainPageContent, extraFiles, componentLib as any)
+  projectStore.setFiles(projectFiles)
+}
 
 watch(currentSession, () => {
   scrollToBottom()
@@ -198,6 +263,10 @@ watch(() => chatStore.pendingPrompt, (prompt) => {
   }
 }, { immediate: true })
 
+onUnmounted(() => {
+  chatStore.cancelStreaming()
+})
+
 function scrollToBottom() {
   nextTick(() => {
     if (messagesContainer.value) {
@@ -206,9 +275,88 @@ function scrollToBottom() {
   })
 }
 
+function buildCallbacks(
+  sessionId: string,
+  _isNewSession: boolean,
+): SSECallbacks {
+  return {
+    onStageStart(event) {
+      chatStore.updateStageStatus(event.stage, 'running', {
+        progressMessage: '',
+      })
+    },
+
+    onStageProgress(event) {
+      chatStore.updateStageStatus(event.stage, 'running', {
+        progressMessage: event.message,
+      })
+    },
+
+    onStageComplete(event) {
+      chatStore.updateStageStatus(event.stage, event.status, {
+        duration: event.duration,
+      })
+
+      if (event.outputType === 'markdown' && event.outputPreview) {
+        chatStore.setStagePreview(event.stageName, 'markdown', event.outputPreview, null, event.filePath)
+        chatStore.setActiveStageTab(event.stageName)
+      }
+
+      if (event.outputType === 'vue' && event.files) {
+        processFilesToProject(event.files, chatStore.currentSession?.componentLib)
+        chatStore.setStagePreview(event.stageName, 'vue', null, event.files, event.vueDirPath)
+        nextTick(() => {
+          chatStore.setActiveStageTab(event.stageName)
+        })
+      }
+
+      scrollToBottom()
+    },
+
+    async onDone(event) {
+      chatStore.isStreaming = false
+      chatStore.abortController = null
+
+      if (event.files) {
+        processFilesToProject(event.files, chatStore.currentSession?.componentLib)
+        chatStore.updateSessionFiles(sessionId, filterSystemFiles(event.files))
+      }
+
+      chatStore.addMessageLocal(sessionId, {
+        role: 'assistant',
+        content: event.message,
+        stages: event.stages as any,
+        failedStep: event.failedStep,
+      })
+
+      await chatStore.loadSession(sessionId)
+
+      if (event.failedStep != null) {
+        ElMessage.warning('生成失败，请点击重试按钮重试')
+      } else {
+        ElMessage.success('生成成功')
+      }
+
+      pendingUserMessage.value = ''
+      scrollToBottom()
+      emit('generated')
+    },
+
+    onError(event) {
+      chatStore.isStreaming = false
+      chatStore.abortController = null
+      chatStore.setLoading(false)
+      pendingUserMessage.value = ''
+      ElMessage.error(`生成失败：${event.message}`)
+      scrollToBottom()
+      emit('generated')
+    },
+  }
+}
+
 async function sendMessage() {
   const message = inputMessage.value.trim()
-  if (!message || isLoading.value) return
+  if (!message || isLoading.value || chatStore.isStreaming) return
 
   inputMessage.value = ''
   let sessionId = chatStore.currentSessionId
@@ -234,57 +382,50 @@ async function sendMessage() {
     })
     
     const hasExistingFiles = currentSession.value?.files && currentSession.value.files.length > 0
-    
-    let result
-    if (hasExistingFiles) {
-      result = await generateIterate({
-        prompt: message,
-        sessionId,
-        files: currentSession.value!.files!,
-      })
+    const isNewSession = !hasExistingFiles
+
+    const controller = new AbortController()
+    chatStore.abortController = controller
+    chatStore.isStreaming = true
+
+    const stageNames = isNewSession
+      ? ['attachment', 'requirement', 'generation', 'optimization']
+      : ['iteration']
+    chatStore.resetStageProgresses(stageNames)
+
+    const callbacks = buildCallbacks(sessionId!, isNewSession)
+
+    if (isNewSession) {
+      await generateInitialStream(
+        {
+          prompt: message,
+          sessionId,
+          debug: false,
+          componentLib: currentSession.value?.componentLib,
+          attachments: attachmentsToSend,
+        },
+        callbacks,
+        controller.signal,
+      )
     } else {
-      result = await generateInitial({
-        prompt: message,
-        sessionId,
-        debug: false,
-        componentLib: currentSession.value?.componentLib,
-        attachments: attachmentsToSend,
-      })
-    }
-
-    const SYSTEM_FILE_PATHS = new Set([
-      '/src/main.ts',
-      '/src/App.vue',
-      '/src/style.css',
-      '/public/index.html',
-      '/package.json',
-      '/vite.config.ts',
-    ])
-
-    const userFiles = result.files?.filter(f => !SYSTEM_FILE_PATHS.has(f.path)) || []
-
-    const mainPageContent = userFiles[0]?.content || ''
-    const extraFiles: ProjectFile[] = userFiles.slice(1).map((f) => ({
-      id: f.id,
-      name: f.name,
-      path: f.path,
-      type: f.type as 'file',
-      language: f.language as ProjectFile['language'],
-      content: f.content,
-    }))
-    const projectFiles = buildProjectFiles(mainPageContent, extraFiles, currentSession.value?.componentLib)
-    projectStore.setFiles(projectFiles)
-    chatStore.updateSessionFiles(sessionId!, userFiles)
-    
-    await chatStore.loadSession(sessionId!)
-
-    if ('failedStep' in result && result.failedStep != null) {
-      ElMessage.warning('生成失败，请点击重试按钮重试')
-    } else {
-      ElMessage.success('生成成功')
+      await generateIterateStream(
+        {
+          prompt: message,
+          sessionId,
+          files: currentSession.value!.files!,
+        },
+        callbacks,
+        controller.signal,
+      )
     }
   } catch (error) {
-    ElMessage.error('生成失败: ' + (error as Error).message)
+    if ((error as Error).name === 'AbortError') {
+      ElMessage.info('已取消生成')
+    } else {
+      ElMessage.error('生成失败: ' + (error as Error).message)
+    }
+    chatStore.isStreaming = false
+    chatStore.abortController = null
   } finally {
     chatStore.setLoading(false)
     pendingUserMessage.value = ''
@@ -293,58 +434,85 @@ async function sendMessage() {
   }
 }
 
+async function handleRetryFromStage(stage: number) {
+  const sessionId = chatStore.currentSessionId
+  const session = chatStore.currentSession
+  if (!sessionId || !session) return
+
+  const firstUserMessage = session.messages.find(m => m.role === 'user')
+  if (!firstUserMessage) return
+
+  const controller = new AbortController()
+  chatStore.abortController = controller
+  chatStore.isStreaming = true
+  chatStore.setLoading(true)
+
+  const stageNames = ['attachment', 'requirement', 'generation', 'optimization']
+  chatStore.resetStageProgresses(stageNames)
+
+  const callbacks = buildCallbacks(sessionId, true)
+
+  try {
+    await generateInitialStream(
+      {
+        prompt: firstUserMessage.content,
+        sessionId,
+        componentLib: session.componentLib,
+        fromStep: stage,
+      },
+      callbacks,
+      controller.signal,
+    )
+  } catch (error) {
+    if ((error as Error).name === 'AbortError') {
+      ElMessage.info('已取消生成')
+    } else {
+      ElMessage.error('重试失败: ' + (error as Error).message)
+    }
+    chatStore.isStreaming = false
+    chatStore.abortController = null
+    chatStore.setLoading(false)
+  }
+}
+
 async function handleRetry(message: ChatMessage) {
-  if (!currentSession.value || message.failedStep == null || isRetrying.value) return
+  if (!currentSession.value || message.failedStep == null || isRetrying.value || chatStore.isStreaming) return
 
   const sessionId = chatStore.currentSessionId!
   const firstUserMessage = currentSession.value.messages.find(m => m.role === 'user')
   if (!firstUserMessage) return
 
+  const controller = new AbortController()
+  chatStore.abortController = controller
   isRetrying.value = true
   retryingMessageId.value = message.id
   chatStore.setLoading(true)
+  chatStore.isStreaming = true
+
+  const stageNames = ['attachment', 'requirement', 'generation', 'optimization']
+  chatStore.resetStageProgresses(stageNames)
+
+  const callbacks = buildCallbacks(sessionId, true)
 
   try {
-    const result = await generateInitial({
-      prompt: firstUserMessage.content,
-      sessionId,
-      componentLib: currentSession.value.componentLib,
-      fromStep: message.failedStep,
-    })
-
-    const SYSTEM_FILE_PATHS = new Set([
-      '/src/main.ts',
-      '/src/App.vue',
-      '/src/style.css',
-      '/public/index.html',
-      '/package.json',
-      '/vite.config.ts',
-    ])
-
-    const userFiles = result.files?.filter(f => !SYSTEM_FILE_PATHS.has(f.path)) || []
-
-    const mainPageContent = userFiles[0]?.content || ''
-    const extraFiles: ProjectFile[] = userFiles.slice(1).map((f) => ({
-      id: f.id,
-      name: f.name,
-      path: f.path,
-      type: f.type as 'file',
-      language: f.language as ProjectFile['language'],
-      content: f.content,
-    }))
-    const projectFiles = buildProjectFiles(mainPageContent, extraFiles, currentSession.value?.componentLib)
-    projectStore.setFiles(projectFiles)
-    chatStore.updateSessionFiles(sessionId, userFiles)
-
-    await chatStore.loadSession(sessionId)
-
-    if (result.failedStep != null) {
-      ElMessage.warning('重试仍然失败，请再次点击重试')
-    } else {
-      ElMessage.success('重试成功')
-    }
+    await generateInitialStream(
+      {
+        prompt: firstUserMessage.content,
+        sessionId,
+        componentLib: currentSession.value.componentLib,
+        fromStep: message.failedStep,
+      },
+      callbacks,
+      controller.signal,
+    )
   } catch (error) {
-    ElMessage.error('重试失败: ' + (error as Error).message)
+    if ((error as Error).name === 'AbortError') {
+      ElMessage.info('已取消生成')
+    } else {
+      ElMessage.error('重试失败: ' + (error as Error).message)
+    }
+    chatStore.isStreaming = false
+    chatStore.abortController = null
   } finally {
     isRetrying.value = false
     retryingMessageId.value = null
@@ -352,6 +520,34 @@ async function handleRetry(message: ChatMessage) {
     scrollToBottom()
     emit('generated')
   }
+}
+
+function handleStageClick(stage: StageProgressState) {
+  chatStore.setActiveStageTab(stage.stageName)
+}
+
+async function handleViewStageOutput(
+  assistantMsg: ChatMessage,
+  output: StageOutput,
+) {
+  const session = currentSession.value
+  if (!session) {
+    chatStore.setActiveStageTab(output.stageName)
+    return
+  }
+
+  const allOutputs = session.messages.flatMap(m => m.stageOutputs || [])
+  const sameNameOutputs = allOutputs.filter(o => o.stageName === output.stageName)
+
+  let key: string
+  if (sameNameOutputs.length > 1) {
+    const idx = sameNameOutputs.indexOf(output)
+    key = `${output.stageName}_${idx + 1}`
+  } else {
+    key = output.stageName
+  }
+
+  chatStore.setActiveStageTab(key)
 }
 
 function formatTime(date: Date): string {
@@ -365,5 +561,20 @@ function formatTime(date: Date): string {
   display: flex;
   flex-direction: column;
   justify-content: center;
+}
+
+.stage-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.stage-tag {
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.stage-tag:hover {
+  opacity: 0.8;
 }
 </style>

@@ -1,6 +1,5 @@
 import type { ApiFile } from '@/api'
 
-// 对话消息类型
 export interface Attachment {
   id: string
   url: string
@@ -22,6 +21,17 @@ export interface Stages {
   optimization?: StageInfo
 }
 
+export interface StageOutput {
+  stage: number
+  stageName: string
+  status: 'success' | 'failed' | 'skipped' | 'cached'
+  duration: number | null
+  outputType: 'markdown' | 'json' | 'vue' | null
+  filePath: string | null
+  vueDirPath: string | null
+  error: string | null
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
@@ -30,6 +40,60 @@ export interface ChatMessage {
   attachments?: Attachment[]
   failedStep?: number | null
   stages?: Stages | null
+  stageOutputs?: StageOutput[] | null
+}
+
+export interface StageStartEvent {
+  stage: number
+  stageName: string
+  isRetry?: boolean
+  timestamp: string
+}
+
+export interface StageProgressEvent {
+  stage: number
+  stageName: string
+  message: string
+  progress?: number
+  timestamp: string
+}
+
+export interface StageCompleteEvent {
+  stage: number
+  stageName: string
+  status: 'success' | 'failed' | 'skipped' | 'cached'
+  duration: number | null
+  outputType: 'markdown' | 'json' | 'vue' | null
+  filePath: string | null
+  vueDirPath: string | null
+  outputPreview: string | null
+  files: ApiFile[] | null
+  error: string | null
+  timestamp: string
+}
+
+export interface DoneEvent {
+  files: ApiFile[]
+  message: string
+  stages: Record<string, StageInfo>
+  failedStep: number | null
+  timestamp: string
+}
+
+export interface ErrorEvent {
+  code: number
+  message: string
+  failedStep: number | null
+  stages: Record<string, StageInfo>
+  timestamp: string
+}
+
+export interface StageProgressState {
+  stage: number
+  stageName: string
+  status: 'pending' | 'running' | 'success' | 'failed' | 'skipped' | 'cached'
+  duration: number | null
+  progressMessage?: string
 }
 
 export type ComponentLib = 'ElementUI' | 'aui' | 'ccui'

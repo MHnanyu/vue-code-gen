@@ -42,6 +42,16 @@
               </div>
             </template>
             <div class="text-xs text-gray-400 mt-1">{{ formatTime(session.updatedAt) }}</div>
+            <div v-if="lastAssistantStageOutputs(session).length" class="stage-tags mt-1">
+              <el-tag
+                v-for="output in lastAssistantStageOutputs(session)"
+                :key="output.stage"
+                size="small"
+                :type="output.status === 'success' || output.status === 'cached' ? 'success' : 'danger'"
+              >
+                {{ stageNameMap[output.stageName] || output.stageName }}
+              </el-tag>
+            </div>
           </div>
         </div>
         <el-button
@@ -75,6 +85,21 @@ const chatStore = useChatStore()
 
 const sortedSessions = computed(() => chatStore.sortedSessions)
 const currentSessionId = computed(() => chatStore.currentSessionId)
+
+const stageNameMap: Record<string, string> = {
+  attachment: '附件处理',
+  requirement: '需求标准化',
+  generation: '代码生成',
+  optimization: 'UX 优化',
+  iteration: '迭代修改',
+}
+
+function lastAssistantStageOutputs(session: ChatSession) {
+  const lastAssistant = [...(session.messages || [])]
+    .reverse()
+    .find(m => m.role === 'assistant')
+  return lastAssistant?.stageOutputs || []
+}
 
 const editingSessionId = ref<string | null>(null)
 const editTitle = ref('')

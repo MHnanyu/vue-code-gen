@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { ChatMessage, ChatSession, ComponentLib } from '@/types'
-import type { Attachment } from '@/api'
+import type { ChatMessage, ChatSession, ComponentLib, StageProgressState } from '@/types'
+import type { Attachment, ApiFile } from '@/api'
 import {
   createSession as apiCreateSession,
   getSessions as apiGetSessions,
@@ -19,6 +19,12 @@ export const useChatStore = defineStore('chat', () => {
   const pendingPrompt = ref<string | null>(null)
   const pendingAttachments = ref<Attachment[]>([])
 
+  const isStreaming = ref(false)
+  const abortController = ref<AbortController | null>(null)
+  const stageProgresses = ref<StageProgressState[]>([])
+  const stagePreviewMap = ref<Map<string, { type: 'markdown' | 'vue' | null; content: string | null; files: ApiFile[] | null; filePath: string | null }>>(new Map())
+  const activeStageTab = ref<string | null>(null)
+
   const currentSession = computed(() =>
     sessions.value.find(s => s.id === currentSessionId.value) || null
   )
@@ -26,6 +32,63 @@ export const useChatStore = defineStore('chat', () => {
   const sortedSessions = computed(() =>
     [...sessions.value].sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
   )
+
+  const currentStreamingStage = computed(() => {
+    return stageProgresses.value.find(s => s.status === 'running') ?? null
+  })
+
+  const hasStageOutputs = computed(() => {
+    const session = currentSession.value
+    if (!session) return false
+    return session.messages.some(
+      m => m.role === 'assistant' && m.stageOutputs && m.stageOutputs.length > 0,
+    )
+  })
+
+  function resetStageProgresses(stageNames: string[]): void {
+    stageProgresses.value = stageNames.map((name, index) => ({
+      stage: index,
+      stageName: name,
+      status: 'pending' as const,
+      duration: null,
+    }))
+  }
+
+  function updateStageStatus(
+    stage: number,
+    status: StageProgressState['status'],
+    extra?: Partial<StageProgressState>,
+  ): void {
+    const item = stageProgresses.value.find(s => s.stage === stage)
+    if (item) {
+      item.status = status
+      if (extra) {
+        Object.assign(item, extra)
+      }
+    }
+  }
+
+  function setStagePreview(
+    stageName: string,
+    type: 'markdown' | 'vue' | null,
+    content: string | null,
+    files: ApiFile[] | null,
+    filePath: string | null = null,
+  ): void {
+    stagePreviewMap.value.set(stageName, { type, content, files, filePath })
+  }
+
+  function cancelStreaming(): void {
+    if (abortController.value) {
+      abortController.value.abort()
+      abortController.value = null
+    }
+    isStreaming.value = false
+  }
+
+  function setActiveStageTab(stageName: string | null): void {
+    activeStageTab.value = stageName
+  }
 
   async function createSessionRemote(title: string, componentLib?: ComponentLib): Promise<string | null> {
     try {
@@ -190,6 +253,13 @@ export const useChatStore = defineStore('chat', () => {
     pendingAttachments,
     currentSession,
     sortedSessions,
+    isStreaming,
+    abortController,
+    stageProgresses,
+    stagePreviewMap,
+    activeStageTab,
+    currentStreamingStage,
+    hasStageOutputs,
     createSession,
     createSessionRemote,
     selectSession,
@@ -204,6 +274,11 @@ export const useChatStore = defineStore('chat', () => {
     setPendingPrompt,
     setPendingAttachments,
     clearPendingAttachments,
-    updateSessionFiles
+    updateSessionFiles,
+    resetStageProgresses,
+    updateStageStatus,
+    setStagePreview,
+    cancelStreaming,
+    setActiveStageTab,
   }
 })

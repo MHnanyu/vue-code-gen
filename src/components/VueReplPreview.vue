@@ -43,7 +43,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
 import { Repl, useStore, useVueImportMap } from '@vue/repl'
@@ -247,7 +247,16 @@ function exportStaticHtml() {
   }
 }
 
-watch(() => props.files, syncFilesToRepl, { deep: true, immediate: true })
+let isMounted = true
+onUnmounted(() => {
+  isMounted = false
+  isReplReady.value = false
+})
+
+watch(() => props.files, () => {
+  if (!isMounted) return
+  syncFilesToRepl()
+}, { deep: true, immediate: true })
 
 defineExpose({
   exportStaticHtml,
