@@ -62,7 +62,7 @@
                 <el-tag
                   v-for="output in message.stageOutputs"
                   :key="output.stage"
-                  :type="output.status === 'success' || output.status === 'cached' ? 'success' : output.status === 'failed' ? 'danger' : 'info'"
+                  :type="output.status === 'success' || output.status === 'cached' ? 'success' : output.status === 'failed' ? 'danger' : output.status === 'skipped' ? 'warning' : 'info'"
                   size="small"
                   class="stage-tag"
                   @click="handleViewStageOutput(message, output)"
@@ -72,12 +72,8 @@
                 </el-tag>
               </div>
             </div>
-            <div v-if="message.failedStep != null && lastAssistantMessageId === message.id && !message.stageOutputs?.length" class="mt-2">
-              <el-button type="warning" size="small" :loading="isRetrying && retryingMessageId === message.id" @click="handleRetry(message)">
-                <el-icon class="mr-1"><RefreshRight /></el-icon>
-                重试
-              </el-button>
-              <div v-if="message.stages" class="mt-1 text-xs text-red-500">
+            <div v-if="message.failedStep != null && lastAssistantMessageId === message.id && chatStore.stageProgresses.length === 0 && !chatStore.isStreaming" class="mt-2">
+              <div class="text-xs text-red-500">
                 <template v-for="(stage, key) in message.stages" :key="key">
                   <span v-if="stage?.status === 'error' || stage?.status === 'failed'" class="mr-2">
                     {{ stageNameMap[key as keyof typeof stageNameMap] || key }}: {{ stage?.error }}
@@ -95,6 +91,15 @@
             :is-streaming="chatStore.isStreaming"
             :on-retry="handleRetryFromStage"
             :on-cancel="chatStore.cancelStreaming"
+            @stage-click="handleStageClick"
+          />
+        </div>
+
+        <div v-else-if="persistedStageProgresses.length > 0" class="mb-5">
+          <StageProgress
+            :stages="persistedStageProgresses"
+            :is-streaming="false"
+            :on-retry="handleRetryFromStage"
             @stage-click="handleStageClick"
           />
         </div>
@@ -188,8 +193,6 @@ const inputMessage = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const pendingUserMessage = ref('')
 const currentAttachments = ref<Attachment[]>([])
-const isRetrying = ref(false)
-const retryingMessageId = ref<string | null>(null)
 
 const lastAssistantMessageId = computed(() => {
   const msgs = currentSession.value?.messages || []
@@ -208,6 +211,42 @@ const stageNameMap: Record<string, string> = {
   optimization: 'UX优化',
   iteration: '迭代修改',
 }
+
+const INITIAL_STAGE_KEYS = ['attachment', 'requirement', 'generation', 'optimization']
+
+function stagesToProgressStates(stages: any): StageProgressState[] {
+  const hasInitial = INITIAL_STAGE_KEYS.some(k => stages?.[k])
+  const keys = hasInitial ? INITIAL_STAGE_KEYS : ['iteration']
+  const generationDone = stages?.generation?.status === 'success' || stages?.generation?.status === 'cached'
+  return keys.map((name, index) => {
+    const s = stages?.[name]
+    if (!s) {
+      if (hasInitial && generationDone && index > INITIAL_STAGE_KEYS.indexOf('generation')) {
+        return { stage: index, stageName: name, status: 'skipped', duration: null }
+      }
+      return { stage: index, stageName: name, status: 'pending', duration: null }
+    }
+    const status: StageProgressState['status'] =
+      s.status === 'success' ? 'success' :
+      s.status === 'skipped' ? 'skipped' :
+      s.status === 'error' || s.status === 'failed' ? 'failed' : 'pending'
+    return {
+      stage: index,
+      stageName: name,
+      status,
+      duration: s.duration ?? null,
+      progressMessage: s.error || undefined,
+    }
+  })
+}
+
+const persistedStageProgresses = computed(() => {
+  const msgs = currentSession.value?.messages || []
+  const lastAssistant = [...msgs].reverse().find(m => m.role === 'assistant')
+  if (!lastAssistant?.stages) return []
+  return stagesToProgressStates(lastAssistant.stages)
+})
+
 const currentSession = computed(() => chatStore.currentSession)
 const isLoading = computed(() => chatStore.isLoading)
 
@@ -347,6 +386,16 @@ function buildCallbacks(
       chatStore.abortController = null
       chatStore.setLoading(false)
       pendingUserMessage.value = ''
+
+      chatStore.addMessageLocal(sessionId, {
+        role: 'assistant',
+        content: event.message,
+        stages: event.stages as any,
+        failedStep: event.failedStep,
+      })
+
+      chatStore.loadSession(sessionId)
+
       ElMessage.error(`生成失败：${event.message}`)
       scrollToBottom()
       emit('generated')
@@ -437,7 +486,7 @@ async function sendMessage() {
 async function handleRetryFromStage(stage: number) {
   const sessionId = chatStore.currentSessionId
   const session = chatStore.currentSession
-  if (!sessionId || !session) return
+  if (!sessionId || !session || chatStore.isStreaming) return
 
   const firstUserMessage = session.messages.find(m => m.role === 'user')
   if (!firstUserMessage) return
@@ -458,6 +507,7 @@ async function handleRetryFromStage(stage: number) {
         prompt: firstUserMessage.content,
         sessionId,
         componentLib: session.componentLib,
+        attachments: firstUserMessage.attachments,
         fromStep: stage,
       },
       callbacks,
@@ -471,51 +521,7 @@ async function handleRetryFromStage(stage: number) {
     }
     chatStore.isStreaming = false
     chatStore.abortController = null
-    chatStore.setLoading(false)
-  }
-}
-
-async function handleRetry(message: ChatMessage) {
-  if (!currentSession.value || message.failedStep == null || isRetrying.value || chatStore.isStreaming) return
-
-  const sessionId = chatStore.currentSessionId!
-  const firstUserMessage = currentSession.value.messages.find(m => m.role === 'user')
-  if (!firstUserMessage) return
-
-  const controller = new AbortController()
-  chatStore.abortController = controller
-  isRetrying.value = true
-  retryingMessageId.value = message.id
-  chatStore.setLoading(true)
-  chatStore.isStreaming = true
-
-  const stageNames = ['attachment', 'requirement', 'generation', 'optimization']
-  chatStore.resetStageProgresses(stageNames)
-
-  const callbacks = buildCallbacks(sessionId, true)
-
-  try {
-    await generateInitialStream(
-      {
-        prompt: firstUserMessage.content,
-        sessionId,
-        componentLib: currentSession.value.componentLib,
-        fromStep: message.failedStep,
-      },
-      callbacks,
-      controller.signal,
-    )
-  } catch (error) {
-    if ((error as Error).name === 'AbortError') {
-      ElMessage.info('已取消生成')
-    } else {
-      ElMessage.error('重试失败: ' + (error as Error).message)
-    }
-    chatStore.isStreaming = false
-    chatStore.abortController = null
   } finally {
-    isRetrying.value = false
-    retryingMessageId.value = null
     chatStore.setLoading(false)
     scrollToBottom()
     emit('generated')

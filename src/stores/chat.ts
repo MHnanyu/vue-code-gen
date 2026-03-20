@@ -87,6 +87,9 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function setActiveStageTab(stageName: string | null): void {
+    if (activeStageTab.value === stageName && stageName !== null) {
+      activeStageTab.value = null
+    }
     activeStageTab.value = stageName
   }
 

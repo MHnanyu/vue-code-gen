@@ -1,6 +1,27 @@
 <template>
-  <div class="stage-progress">
-    <div class="stage-list">
+  <div class="stage-progress" :class="{ 'has-failure': hasFailure }">
+    <div
+      class="stage-toggle"
+      @click="collapsed = !collapsed"
+    >
+      <el-icon class="toggle-arrow" :class="{ expanded: !collapsed }"><ArrowRight /></el-icon>
+      <span class="toggle-summary">
+        <template v-if="hasFailure">
+          <el-icon class="toggle-warning"><WarningFilled /></el-icon>
+          {{ failedStageNames.join('、') }} 失败
+        </template>
+        <template v-else-if="isStreaming">
+          正在生成...
+        </template>
+        <template v-else>
+          {{ completedCount }}/{{ stages.length }} 步骤完成
+        </template>
+      </span>
+      <span v-if="!isStreaming" class="toggle-duration">
+        {{ totalDuration }}
+      </span>
+    </div>
+    <div v-show="!collapsed" class="stage-list">
       <div
         v-for="(stage, index) in stages"
         :key="stage.stage"
@@ -19,6 +40,7 @@
             <el-icon v-if="stage.status === 'running'" class="is-loading"><Loading /></el-icon>
             <el-icon v-else-if="stage.status === 'success'"><Check /></el-icon>
             <el-icon v-else-if="stage.status === 'cached'"><Check /></el-icon>
+            <el-icon v-else-if="stage.status === 'skipped'"><SemiSelect /></el-icon>
             <el-icon v-else-if="stage.status === 'failed'"><WarningFilled /></el-icon>
             <span v-else class="stage-dot" />
           </div>
@@ -51,7 +73,7 @@
       </div>
     </div>
 
-    <div v-if="showActions" class="stage-actions">
+    <div v-if="!collapsed && showActions" class="stage-actions">
       <template v-if="isStreaming">
         <el-button size="small" type="danger" plain @click="onCancel?.()">
           <el-icon class="mr-1"><Close /></el-icon>
@@ -67,7 +89,7 @@
           plain
           @click="onRetry?.(stage.stage)"
         >
-          从「{{ STAGE_NAME_MAP[stage.stageName] || stage.stageName }}」重试
+          {{ stage.stageName === 'iteration' ? '重试' : `从步骤${stage.stage}重试（${STAGE_NAME_MAP[stage.stageName] || stage.stageName}）` }}
         </el-button>
       </template>
     </div>
@@ -75,8 +97,8 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
-import { Check, Close, Loading, WarningFilled, Timer } from '@element-plus/icons-vue'
+import { ref, computed, watch } from 'vue'
+import { ArrowRight, Check, Close, Loading, WarningFilled, Timer, SemiSelect } from '@element-plus/icons-vue'
 import type { StageProgressState } from '@/types'
 
 const STAGE_NAME_MAP: Record<string, string> = {
@@ -98,7 +120,47 @@ const emit = defineEmits<{
   'stage-click': [stage: StageProgressState]
 }>()
 
+const hasFailure = computed(() => props.stages.some(s => s.status === 'failed'))
+
+const completedCount = computed(() =>
+  props.stages.filter(s => s.status === 'success' || s.status === 'cached' || s.status === 'skipped').length,
+)
+
+const failedStageNames = computed(() =>
+  props.stages.filter(s => s.status === 'failed').map(s => STAGE_NAME_MAP[s.stageName] || s.stageName),
+)
+
+const totalDuration = computed(() => {
+  const durations = props.stages.filter(s => s.duration != null).map(s => s.duration as number)
+  if (durations.length === 0) return ''
+  const total = durations.reduce((a, b) => a + b, 0)
+  return `${total.toFixed(1)}s`
+})
+
+watch(() => props.isStreaming, (val) => {
+  if (val) {
+    collapsed.value = false
+  }
+})
+
+const collapsed = ref(props.isStreaming ? false : !hasFailure.value)
+
+watch(() => props.isStreaming, (val) => {
+  if (val) {
+    collapsed.value = false
+  }
+})
+
+watch(() => props.stages, () => {
+  if (!props.isStreaming) {
+    collapsed.value = !hasFailure.value
+  }
+})
+
 const retryableStages = computed(() => {
+  if (!props.isStreaming) {
+    return [...props.stages]
+  }
   return props.stages.filter(
     s => s.status === 'success' || s.status === 'cached' || s.status === 'failed' || s.status === 'skipped',
   )
@@ -110,12 +172,12 @@ const showActions = computed(() => {
 
 function topLineClass(index: number): string {
   const prev = props.stages[index - 1]
-  if (prev && (prev.status === 'success' || prev.status === 'cached')) return 'line-done'
+  if (prev && (prev.status === 'success' || prev.status === 'cached' || prev.status === 'skipped')) return 'line-done'
   return 'line-pending'
 }
 
 function bottomLineClass(stage: StageProgressState): string {
-  if (stage.status === 'success' || stage.status === 'cached') return 'line-done'
+  if (stage.status === 'success' || stage.status === 'cached' || stage.status === 'skipped') return 'line-done'
   return 'line-pending'
 }
 
@@ -124,6 +186,7 @@ function iconClass(stage: StageProgressState) {
     case 'running': return 'icon-running'
     case 'success': return 'icon-success'
     case 'cached': return 'icon-cached'
+    case 'skipped': return 'icon-skipped'
     case 'failed': return 'icon-failed'
     default: return 'icon-pending'
   }
@@ -136,7 +199,47 @@ function handleStageClick(stage: StageProgressState) {
 
 <style scoped>
 .stage-progress {
-  padding: 12px 0;
+  padding: 2px 0;
+}
+
+.stage-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: #606266;
+  user-select: none;
+}
+
+.stage-toggle:hover {
+  background: #f5f7fa;
+}
+
+.stage-progress.has-failure .stage-toggle {
+  color: #f56c6c;
+}
+
+.toggle-arrow {
+  font-size: 12px;
+  transition: transform 0.2s;
+}
+
+.toggle-arrow.expanded {
+  transform: rotate(90deg);
+}
+
+.toggle-warning {
+  color: #f56c6c;
+  margin-right: 2px;
+}
+
+.toggle-duration {
+  margin-left: auto;
+  font-size: 11px;
+  color: #c0c4cc;
 }
 
 .stage-list {
@@ -146,9 +249,9 @@ function handleStageClick(stage: StageProgressState) {
 
 .stage-item {
   display: flex;
-  gap: 12px;
-  padding: 6px 12px;
-  border-radius: 6px;
+  gap: 8px;
+  padding: 3px 8px;
+  border-radius: 4px;
   cursor: pointer;
   transition: background 0.2s;
 }
@@ -165,14 +268,14 @@ function handleStageClick(stage: StageProgressState) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 20px;
+  width: 18px;
   flex-shrink: 0;
 }
 
 .stage-line {
   width: 2px;
   flex: 1;
-  min-height: 4px;
+  min-height: 2px;
 }
 
 .line-done {
@@ -185,18 +288,18 @@ function handleStageClick(stage: StageProgressState) {
 
 .stage-line-spacer {
   flex: 1;
-  min-height: 4px;
+  min-height: 2px;
 }
 
 .stage-icon {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .icon-success {
@@ -207,6 +310,12 @@ function handleStageClick(stage: StageProgressState) {
 .icon-cached {
   background: #e6a23c;
   color: #fff;
+}
+
+.icon-skipped {
+  background: #e6a23c;
+  color: #fff;
+  opacity: 0.6;
 }
 
 .icon-running {
@@ -233,17 +342,17 @@ function handleStageClick(stage: StageProgressState) {
 .stage-right {
   flex: 1;
   min-width: 0;
-  padding: 1px 0;
+  padding: 0;
 }
 
 .stage-header {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
 }
 
 .stage-name {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: #303133;
 }
@@ -255,8 +364,8 @@ function handleStageClick(stage: StageProgressState) {
 .stage-meta {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-top: 2px;
+  gap: 6px;
+  margin-top: 1px;
 }
 
 .stage-duration {
@@ -277,7 +386,7 @@ function handleStageClick(stage: StageProgressState) {
 }
 
 .stage-error {
-  margin-top: 2px;
+  margin-top: 1px;
   font-size: 11px;
   color: #f56c6c;
 }
@@ -286,8 +395,8 @@ function handleStageClick(stage: StageProgressState) {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 8px 12px 0;
-  margin-top: 4px;
+  padding: 4px 8px 0;
+  margin-top: 2px;
   border-top: 1px solid #ebeef5;
 }
 </style>

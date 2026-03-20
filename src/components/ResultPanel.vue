@@ -204,18 +204,12 @@ const completedStages = computed<CompletedStage[]>(() => {
   const fromProgress = chatStore.stageProgresses.filter(s => s.status !== 'pending')
   const existingProgressNames = new Set<string>()
   for (const s of fromProgress) {
-    const baseName = STAGE_NAME_MAP[s.stageName] || s.stageName
-    let key = s.stageName
-    let label = baseName
-    if (usedKeys.has(key)) {
-      const count = nameCount.get(s.stageName) || 0
-      const idx = count + 1
-      key = `${s.stageName}_${idx}`
-      label = `${baseName} #${idx}`
-      nameCount.set(s.stageName, idx)
-    }
-    usedKeys.add(key)
+    if (existingProgressNames.has(s.stageName)) continue
     existingProgressNames.add(s.stageName)
+    let key = s.stageName
+    let label = STAGE_NAME_MAP[s.stageName] || s.stageName
+    if (usedKeys.has(key)) continue
+    usedKeys.add(key)
     result.push({
       _key: key,
       _label: label,
@@ -276,7 +270,7 @@ watch(() => chatStore.activeStageTab, async (key) => {
       await ensureStageContentLoaded(target._key)
     }
   }
-})
+}, { flush: 'sync' })
 
 async function ensureStageContentLoaded(key: string) {
   if (stageContentCache.value.has(key)) return
@@ -350,6 +344,14 @@ watch(() => chatStore.hasStageOutputs, async (has) => {
   if (has && activeStageKey.value) {
     stageContentCache.value.clear()
     await ensureStageContentLoaded(activeStageKey.value)
+  }
+})
+
+watch(() => chatStore.currentSessionId, () => {
+  stageContentCache.value.clear()
+  activeStageKey.value = ''
+  if (activeTab.value === 'stages') {
+    activeTab.value = 'preview'
   }
 })
 

@@ -42,14 +42,14 @@
               </div>
             </template>
             <div class="text-xs text-gray-400 mt-1">{{ formatTime(session.updatedAt) }}</div>
-            <div v-if="lastAssistantStageOutputs(session).length" class="stage-tags mt-1">
+            <div v-if="lastAssistantStageSummary(session).length" class="stage-tags mt-1">
               <el-tag
-                v-for="output in lastAssistantStageOutputs(session)"
-                :key="output.stage"
+                v-for="item in lastAssistantStageSummary(session)"
+                :key="item.name"
                 size="small"
-                :type="output.status === 'success' || output.status === 'cached' ? 'success' : 'danger'"
+                :type="item.status === 'success' || item.status === 'cached' ? 'success' : item.status === 'failed' ? 'danger' : item.status === 'skipped' ? 'warning' : 'info'"
               >
-                {{ stageNameMap[output.stageName] || output.stageName }}
+                {{ stageNameMap[item.name] || item.name }}
               </el-tag>
             </div>
           </div>
@@ -92,6 +92,40 @@ const stageNameMap: Record<string, string> = {
   generation: '代码生成',
   optimization: 'UX 优化',
   iteration: '迭代修改',
+}
+
+function lastAssistantStageSummary(session: ChatSession) {
+  const lastAssistant = [...(session.messages || [])]
+    .reverse()
+    .find(m => m.role === 'assistant')
+  if (!lastAssistant) return []
+
+  const stages = lastAssistant.stages
+  const stageOutputs = lastAssistant.stageOutputs || []
+
+  const INITIAL_KEYS = ['attachment', 'requirement', 'generation', 'optimization']
+  const hasInitial = INITIAL_KEYS.some(k => stages?.[k])
+  const keys = hasInitial ? INITIAL_KEYS : ['iteration']
+
+  const result: { name: string; status: string }[] = []
+  for (const name of keys) {
+    const s = stages?.[name]
+    if (!s) {
+      if (hasInitial && stages?.generation?.status === 'success' && name === 'optimization') {
+        result.push({ name, status: 'skipped' })
+      }
+      continue
+    }
+    result.push({ name, status: s.status })
+  }
+
+  if (result.length === 0) {
+    for (const output of stageOutputs) {
+      result.push({ name: output.stageName, status: output.status })
+    }
+  }
+
+  return result
 }
 
 function lastAssistantStageOutputs(session: ChatSession) {
