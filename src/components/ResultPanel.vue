@@ -195,37 +195,39 @@ const completedStages = computed<CompletedStage[]>(() => {
     })
   }
 
-  const fromProgress = chatStore.stageProgresses.filter(s => s.status !== 'pending')
-  const existingProgressNames = new Set<string>()
-  for (const s of fromProgress) {
-    if (existingProgressNames.has(s.stageName)) continue
-    existingProgressNames.add(s.stageName)
-    let key = s.stageName
-    let label = STAGE_NAME_MAP[s.stageName] || s.stageName
-    if (usedKeys.has(key)) continue
-    usedKeys.add(key)
-    result.push({
-      _key: key,
-      _label: label,
-      stage: s.stage,
-      stageName: s.stageName,
-      status: s.status,
-      duration: s.duration,
-    })
-  }
+  if (chatStore.isStreaming) {
+    const fromProgress = chatStore.stageProgresses.filter(s => s.status !== 'pending')
+    const existingProgressNames = new Set<string>()
+    for (const s of fromProgress) {
+      if (existingProgressNames.has(s.stageName)) continue
+      existingProgressNames.add(s.stageName)
+      let key = s.stageName
+      let label = STAGE_NAME_MAP[s.stageName] || s.stageName
+      if (usedKeys.has(key)) continue
+      usedKeys.add(key)
+      result.push({
+        _key: key,
+        _label: label,
+        stage: s.stage,
+        stageName: s.stageName,
+        status: s.status,
+        duration: s.duration,
+      })
+    }
 
-  for (const [name, preview] of chatStore.stagePreviewMap) {
-    if (!existingProgressNames.has(name) && preview.type) {
-      if (!usedKeys.has(name)) {
-        usedKeys.add(name)
-        result.push({
-          _key: name,
-          _label: STAGE_NAME_MAP[name] || name,
-          stage: -1,
-          stageName: name,
-          status: 'success',
-          duration: null,
-        })
+    for (const [name, preview] of chatStore.stagePreviewMap) {
+      if (!existingProgressNames.has(name) && preview.type) {
+        if (!usedKeys.has(name)) {
+          usedKeys.add(name)
+          result.push({
+            _key: name,
+            _label: STAGE_NAME_MAP[name] || name,
+            stage: -1,
+            stageName: name,
+            status: 'success',
+            duration: null,
+          })
+        }
       }
     }
   }

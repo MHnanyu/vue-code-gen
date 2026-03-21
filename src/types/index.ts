@@ -1,7 +1,7 @@
 import type { ApiFile, Attachment } from '@/api'
 
 export interface StageInfo {
-  status: 'success' | 'skipped' | 'error' | 'failed'
+  status: 'success' | 'skipped' | 'error' | 'failed' | 'cancelled'
   duration: number | null
   output: string | null
   error: string | null
@@ -94,7 +94,7 @@ export interface CancelledEvent {
 export interface StageProgressState {
   stage: number
   stageName: string
-  status: 'pending' | 'running' | 'success' | 'failed' | 'skipped' | 'cached'
+  status: 'pending' | 'running' | 'success' | 'failed' | 'skipped' | 'cached' | 'cancelled'
   duration: number | null
   progressMessage?: string
 }

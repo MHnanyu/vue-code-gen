@@ -80,9 +80,10 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function cancelStreaming(): void {
-    if (currentTaskId.value) {
-      apiCancelGeneration(currentTaskId.value).catch(() => {})
-    }
+    if (!currentTaskId.value || !isStreaming.value) return
+    apiCancelGeneration(currentTaskId.value).catch((e) => {
+      console.error('Cancel generation failed:', e)
+    })
   }
 
   function setActiveStageTab(stageName: string | null): void {

@@ -54,14 +54,14 @@
                 v-if="isLastAssistantMessage(idx) && persistedStageProgresses.length > 0"
                 :stages="persistedStageProgresses"
                 :is-streaming="false"
-                :on-retry="handleRetryFromStage"
-                @stage-click="handleStageClick"
+                :retry-fn="chatStore.isStreaming ? undefined : handleRetryFromStage"
+                @stage-click="(stage: StageProgressState) => handleStageClick(stage, message)"
               />
               <StageProgress
                 v-else-if="message.stages"
                 :stages="messageProgresses(message)"
                 :is-streaming="false"
-                @stage-click="handleStageClick"
+                @stage-click="(stage: StageProgressState) => handleStageClick(stage, message)"
               />
             </div>
 
@@ -93,8 +93,8 @@
             <StageProgress
               :stages="chatStore.stageProgresses"
               :is-streaming="true"
-              :on-retry="handleRetryFromStage"
-              :on-cancel="chatStore.cancelStreaming"
+              :retry-fn="handleRetryFromStage"
+              :cancel-fn="chatStore.cancelStreaming"
               @stage-click="handleStageClick"
             />
           </div>
@@ -125,8 +125,8 @@
           <StageProgress
             :stages="chatStore.stageProgresses"
             :is-streaming="chatStore.isStreaming"
-            :on-retry="handleRetryFromStage"
-            :on-cancel="chatStore.cancelStreaming"
+            :retry-fn="handleRetryFromStage"
+            :cancel-fn="chatStore.cancelStreaming"
             @stage-click="handleStageClick"
           />
         </div>
@@ -172,7 +172,7 @@ import { useProjectStore } from '@/stores/project'
 import { generateInitialStream, generateIterateStream, type ApiFile, type Attachment, type SSECallbacks, API_BASE } from '@/api'
 import { apiFilesToProjectFiles, filterUserFiles } from '@/utils/files'
 import { STAGE_NAME_MAP, INITIAL_STAGE_KEYS } from '@/constants/stages'
-import type { StageProgressState } from '@/types'
+import type { ChatMessage, StageProgressState } from '@/types'
 import StageProgress from '@/components/StageProgress.vue'
 
 const props = defineProps<{
@@ -205,10 +205,18 @@ function isLastAssistantMessage(index: number): boolean {
   return lastAssistantMessageId.value?.index === index
 }
 
-function stagesToProgressStates(stages: any): StageProgressState[] {
+function stagesToProgressStates(stages: any, stepMessages?: any[] | null): StageProgressState[] {
   const hasInitial = INITIAL_STAGE_KEYS.some(k => stages?.[k])
   const keys = hasInitial ? INITIAL_STAGE_KEYS : ['iteration']
   const generationDone = stages?.generation?.status === 'success' || stages?.generation?.status === 'cached'
+  const stepMsgMap = new Map<string, string>()
+  if (stepMessages) {
+    for (const sm of stepMessages) {
+      if (sm.stageName && sm.message) {
+        stepMsgMap.set(sm.stageName, sm.message)
+      }
+    }
+  }
   return keys.map((name, index) => {
     const s = stages?.[name]
     if (!s) {
@@ -220,13 +228,14 @@ function stagesToProgressStates(stages: any): StageProgressState[] {
     const status: StageProgressState['status'] =
       s.status === 'success' ? 'success' :
       s.status === 'skipped' ? 'skipped' :
-      s.status === 'error' || s.status === 'failed' ? 'failed' : 'pending'
+      s.status === 'error' || s.status === 'failed' ? 'failed' :
+      s.status === 'cancelled' ? 'cancelled' : 'pending'
     return {
       stage: index,
       stageName: name,
       status,
       duration: s.duration ?? null,
-      progressMessage: s.error || undefined,
+      progressMessage: s.error || stepMsgMap.get(name) || undefined,
     }
   })
 }
@@ -235,12 +244,12 @@ const persistedStageProgresses = computed(() => {
   const msgs = currentSession.value?.messages || []
   const lastAssistant = [...msgs].reverse().find(m => m.role === 'assistant')
   if (!lastAssistant?.stages) return []
-  return stagesToProgressStates(lastAssistant.stages)
+  return stagesToProgressStates(lastAssistant.stages, lastAssistant.stepMessages)
 })
 
-function messageProgresses(message: { stages?: any }): StageProgressState[] {
+function messageProgresses(message: { stages?: any; stepMessages?: any[] | null }): StageProgressState[] {
   if (!message.stages) return []
-  return stagesToProgressStates(message.stages)
+  return stagesToProgressStates(message.stages, message.stepMessages)
 }
 
 const currentSession = computed(() => chatStore.currentSession)
@@ -502,7 +511,20 @@ async function handleRetryFromStage(stage: number) {
   )
 }
 
-function handleStageClick(stage: StageProgressState) {
+function handleStageClick(stage: StageProgressState, message?: ChatMessage) {
+  const session = chatStore.currentSession
+  if (session && message?.stepMessages) {
+    const allOutputs = session.messages.flatMap(m => m.stepMessages || [])
+    const sameNameOutputs = allOutputs.filter(o => o.stageName === stage.stageName)
+    if (sameNameOutputs.length > 1) {
+      const msgOutput = message.stepMessages.find(o => o.stageName === stage.stageName)
+      if (msgOutput) {
+        const idx = sameNameOutputs.indexOf(msgOutput) + 1
+        chatStore.setActiveStageTab(`${stage.stageName}_${idx}`)
+        return
+      }
+    }
+  }
   chatStore.setActiveStageTab(stage.stageName)
 }
 
