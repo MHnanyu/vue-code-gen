@@ -9,6 +9,7 @@ import {
   deleteSession as apiDeleteSession,
   updateSessionTitle as apiUpdateSessionTitle,
   addMessage as apiAddMessage,
+  cancelGeneration as apiCancelGeneration,
   transformApiSession,
 } from '@/api'
 
@@ -20,7 +21,7 @@ export const useChatStore = defineStore('chat', () => {
   const pendingAttachments = ref<Attachment[]>([])
 
   const isStreaming = ref(false)
-  const abortController = ref<AbortController | null>(null)
+  const currentTaskId = ref<string | null>(null)
   const stageProgresses = ref<StageProgressState[]>([])
   const stagePreviewMap = ref<Map<string, { type: 'markdown' | 'vue' | null; content: string | null; files: ApiFile[] | null; filePath: string | null }>>(new Map())
   const activeStageTab = ref<string | null>(null)
@@ -79,11 +80,9 @@ export const useChatStore = defineStore('chat', () => {
   }
 
   function cancelStreaming(): void {
-    if (abortController.value) {
-      abortController.value.abort()
-      abortController.value = null
+    if (currentTaskId.value) {
+      apiCancelGeneration(currentTaskId.value).catch(() => {})
     }
-    isStreaming.value = false
   }
 
   function setActiveStageTab(stageName: string | null): void {
@@ -252,7 +251,7 @@ export const useChatStore = defineStore('chat', () => {
     currentSession,
     sortedSessions,
     isStreaming,
-    abortController,
+    currentTaskId,
     stageProgresses,
     stagePreviewMap,
     activeStageTab,

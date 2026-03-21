@@ -27,9 +27,8 @@
         :key="stage.stage"
         class="stage-item"
         :class="{ active: stage.status === 'running' }"
-        @click="handleStageClick(stage)"
       >
-        <div class="stage-left">
+        <div class="stage-left" @click="handleStageClick(stage)">
           <div
             v-if="index > 0"
             class="stage-line"
@@ -51,11 +50,14 @@
           />
           <div v-else class="stage-line-spacer" />
         </div>
-        <div class="stage-right">
+        <div class="stage-right" @click="handleStageClick(stage)">
           <div class="stage-header">
             <span class="stage-name">{{ STAGE_NAME_MAP[stage.stageName] || stage.stageName }}</span>
             <el-tag v-if="stage.status === 'cached'" size="small" type="info" class="stage-badge">缓存</el-tag>
             <el-tag v-else-if="stage.status === 'skipped'" size="small" type="info" class="stage-badge">跳过</el-tag>
+            <span v-if="isRetryable(stage) && !isStreaming" class="stage-retry-btn" @click.stop="onRetry?.(stage.stage)">
+              重试
+            </span>
           </div>
           <div class="stage-meta">
             <span v-if="stage.duration != null" class="stage-duration">
@@ -73,25 +75,11 @@
       </div>
     </div>
 
-    <div v-if="!collapsed && showActions" class="stage-actions">
-      <template v-if="isStreaming">
-        <el-button size="small" type="danger" plain @click="onCancel?.()">
-          <el-icon class="mr-1"><Close /></el-icon>
-          取消生成
-        </el-button>
-      </template>
-      <template v-else>
-        <el-button
-          v-for="stage in retryableStages"
-          :key="stage.stage"
-          size="small"
-          type="warning"
-          plain
-          @click="onRetry?.(stage.stage)"
-        >
-          {{ stage.stageName === 'iteration' ? '重试' : `从步骤${stage.stage}重试（${STAGE_NAME_MAP[stage.stageName] || stage.stageName}）` }}
-        </el-button>
-      </template>
+    <div v-if="!collapsed && isStreaming" class="stage-actions">
+      <el-button size="small" type="danger" plain @click="onCancel?.()">
+        <el-icon class="mr-1"><Close /></el-icon>
+        取消生成
+      </el-button>
     </div>
   </div>
 </template>
@@ -130,32 +118,25 @@ const totalDuration = computed(() => {
   return `${total.toFixed(1)}s`
 })
 
-watch(() => props.isStreaming, (val) => {
+const collapsed = ref(props.isStreaming ? false : !hasFailure.value)
+
+watch(() => props.isStreaming, (val, oldVal) => {
+  if (val) {
+    collapsed.value = false
+  } else if (oldVal === true) {
+    collapsed.value = !hasFailure.value
+  }
+})
+
+watch(hasFailure, (val) => {
   if (val) {
     collapsed.value = false
   }
 })
 
-const collapsed = ref(props.isStreaming ? false : !hasFailure.value)
-
-watch(() => props.stages, () => {
-  if (!props.isStreaming) {
-    collapsed.value = !hasFailure.value
-  }
-})
-
-const retryableStages = computed(() => {
-  if (!props.isStreaming) {
-    return [...props.stages]
-  }
-  return props.stages.filter(
-    s => s.status === 'success' || s.status === 'cached' || s.status === 'failed' || s.status === 'skipped',
-  )
-})
-
-const showActions = computed(() => {
-  return props.isStreaming || retryableStages.value.length > 0
-})
+function isRetryable(stage: StageProgressState): boolean {
+  return stage.status === 'success' || stage.status === 'cached' || stage.status === 'failed' || stage.status === 'skipped'
+}
 
 function topLineClass(index: number): string {
   const prev = props.stages[index - 1]
@@ -389,5 +370,20 @@ function handleStageClick(stage: StageProgressState) {
   padding: 4px 8px 0;
   margin-top: 2px;
   border-top: 1px solid #ebeef5;
+}
+
+.stage-retry-btn {
+  font-size: 11px;
+  color: #e6a23c;
+  cursor: pointer;
+  margin-left: auto;
+  flex-shrink: 0;
+  padding: 0 4px;
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+.stage-retry-btn:hover {
+  background: #fdf6ec;
 }
 </style>

@@ -4,6 +4,7 @@ import type {
   StageCompleteEvent,
   DoneEvent,
   ErrorEvent,
+  CancelledEvent,
 } from '@/types'
 import { API_BASE } from '@/api'
 
@@ -13,19 +14,18 @@ export interface SSECallbacks {
   onStageComplete?: (event: StageCompleteEvent) => void
   onDone?: (event: DoneEvent) => void
   onError?: (event: ErrorEvent) => void
+  onCancelled?: (event: CancelledEvent) => void
 }
 
 export async function fetchSSEStream(
   endpoint: string,
   body: Record<string, unknown>,
   callbacks: SSECallbacks,
-  signal?: AbortSignal,
 ): Promise<void> {
   const response = await fetch(`${API_BASE}${endpoint}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-    signal,
   })
 
   if (!response.ok) {
@@ -88,6 +88,9 @@ function dispatchEvent(
       break
     case 'error':
       callbacks.onError?.(data as ErrorEvent)
+      break
+    case 'cancelled':
+      callbacks.onCancelled?.(data as CancelledEvent)
       break
   }
 }

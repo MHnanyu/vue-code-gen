@@ -19,58 +19,64 @@
     </div>
 
     <div class="flex-1 overflow-y-auto p-4" ref="messagesContainer">
-      <template v-if="currentSession?.messages.length">
-        <div
-          v-for="message in currentSession.messages"
-          :key="message.id"
-          class="flex gap-3 mb-5"
-          :class="message.role === 'user' ? 'flex-row-reverse' : ''"
-        >
-          <div class="flex-shrink-0">
-            <el-avatar :size="32" :style="{ background: message.role === 'user' ? '#409eff' : '#67c23a' }">
-              {{ message.role === 'user' ? 'U' : 'AI' }}
-            </el-avatar>
-          </div>
-          <div 
-            class="max-w-[80%]"
-            :class="message.role === 'user' ? 'flex flex-col items-end' : ''"
-          >
-            <div 
-              class="px-4 py-3 rounded-xl leading-relaxed break-words"
-              :class="message.role === 'user' ? 'bg-blue-500 text-white' : 'bg-gray-100'"
-            >
-              <div v-if="message.attachments?.length" class="flex flex-wrap gap-2 mb-2 items-center">
-                <template v-for="att in message.attachments" :key="att.id">
-                  <el-popover v-if="att.type === 'image'" placement="top" :width="300" trigger="hover">
-                    <template #reference>
-                      <img :src="`${API_BASE}${att.url}`" class="w-16 h-16 rounded-lg object-cover cursor-pointer border-2 border-white/30 shrink-0" />
-                    </template>
-                    <img :src="`${API_BASE}${att.url}`" class="w-full rounded" />
-                  </el-popover>
-                  <el-tooltip v-else :content="att.name" placement="top" :show-after="300">
-                    <div class="flex items-center gap-1 w-16 h-16 rounded-lg bg-blue-400 text-white text-xs shrink-0 flex-col justify-center cursor-default">
-                      <el-icon :size="20"><Document /></el-icon>
-                      <span class="w-full text-center truncate px-1">{{ att.name }}</span>
-                    </div>
-                  </el-tooltip>
-                </template>
-              </div>
-              {{ message.content }}
+      <template v-if="currentSession?.messages.length || chatStore.isStreaming">
+        <template v-for="(message, idx) in currentSession.messages" :key="message.id">
+          <div v-if="message.role === 'user'" class="flex gap-3 mb-3 flex-row-reverse">
+            <div class="flex-shrink-0">
+              <el-avatar :size="32" style="background: #409eff">U</el-avatar>
             </div>
-            <div v-if="message.stepMessages?.length && message.role === 'assistant'" class="mt-2">
-              <div class="step-timeline">
-                <div
-                  v-for="step in message.stepMessages"
-                  :key="step.stage"
-                  class="step-item"
-                >
-                  <span class="step-dot" :class="'step-dot--' + step.status"></span>
-                  <span class="step-label">{{ STAGE_NAME_MAP[step.stageName] || step.stageName }}</span>
-                  <span class="step-duration">{{ step.duration != null ? step.duration.toFixed(1) + 's' : '--' }}</span>
+            <div class="max-w-[80%] flex flex-col items-end">
+              <div class="px-4 py-3 rounded-xl leading-relaxed break-words bg-blue-500 text-white">
+                <div v-if="message.attachments?.length" class="flex flex-wrap gap-2 mb-2 items-center">
+                  <template v-for="att in message.attachments" :key="att.id">
+                    <el-popover v-if="att.type === 'image'" placement="top" :width="300" trigger="hover">
+                      <template #reference>
+                        <img :src="`${API_BASE}${att.url}`" class="w-16 h-16 rounded-lg object-cover cursor-pointer border-2 border-white/30 shrink-0" />
+                      </template>
+                      <img :src="`${API_BASE}${att.url}`" class="w-full rounded" />
+                    </el-popover>
+                    <el-tooltip v-else :content="att.name" placement="top" :show-after="300">
+                      <div class="flex items-center gap-1 w-16 h-16 rounded-lg bg-blue-400 text-white text-xs shrink-0 flex-col justify-center cursor-default">
+                        <el-icon :size="20"><Document /></el-icon>
+                        <span class="w-full text-center truncate px-1">{{ att.name }}</span>
+                      </div>
+                    </el-tooltip>
+                  </template>
+                </div>
+                {{ message.content }}
+              </div>
+            </div>
+          </div>
+
+          <template v-else-if="message.role === 'assistant'">
+            <div class="mb-3">
+              <StageProgress
+                v-if="isLastAssistantMessage(idx) && persistedStageProgresses.length > 0"
+                :stages="persistedStageProgresses"
+                :is-streaming="false"
+                :on-retry="handleRetryFromStage"
+                @stage-click="handleStageClick"
+              />
+              <StageProgress
+                v-else-if="message.stages"
+                :stages="messageProgresses(message)"
+                :is-streaming="false"
+                @stage-click="handleStageClick"
+              />
+            </div>
+
+            <div class="flex gap-3 mb-5">
+              <div class="flex-shrink-0">
+                <el-avatar :size="32" style="background: #67c23a">AI</el-avatar>
+              </div>
+              <div class="max-w-[80%]">
+                <div class="px-4 py-3 rounded-xl leading-relaxed break-words bg-gray-100">
+                  {{ message.content }}
                 </div>
               </div>
             </div>
-            <div v-if="message.failedStep != null && lastAssistantMessageId === message.id && chatStore.stageProgresses.length === 0 && !chatStore.isStreaming" class="mt-2">
+
+            <div v-if="isLastAssistantMessage(idx) && !chatStore.isStreaming && chatStore.stageProgresses.length === 0 && message.failedStep != null" class="mb-3 px-11">
               <div class="text-xs text-red-500">
                 <template v-for="(stage, key) in message.stages" :key="key">
                   <span v-if="stage?.status === 'error' || stage?.status === 'failed'" class="mr-2">
@@ -79,40 +85,36 @@
                 </template>
               </div>
             </div>
-            <div class="text-xs text-gray-400 mt-1">{{ formatTime(message.timestamp) }}</div>
+          </template>
+        </template>
+
+        <template v-if="chatStore.isStreaming">
+          <div class="mb-3">
+            <StageProgress
+              :stages="chatStore.stageProgresses"
+              :is-streaming="true"
+              :on-retry="handleRetryFromStage"
+              :on-cancel="chatStore.cancelStreaming"
+              @stage-click="handleStageClick"
+            />
           </div>
-        </div>
-
-        <div v-if="chatStore.isStreaming || chatStore.stageProgresses.length > 0" class="mb-5">
-          <StageProgress
-            :stages="chatStore.stageProgresses"
-            :is-streaming="chatStore.isStreaming"
-            :on-retry="handleRetryFromStage"
-            :on-cancel="chatStore.cancelStreaming"
-            @stage-click="handleStageClick"
-          />
-        </div>
-
-        <div v-else-if="persistedStageProgresses.length > 0" class="mb-5">
-          <StageProgress
-            :stages="persistedStageProgresses"
-            :is-streaming="false"
-            :on-retry="handleRetryFromStage"
-            @stage-click="handleStageClick"
-          />
-        </div>
-
-        <div v-else-if="isLoading && !chatStore.isStreaming" class="flex gap-3 mb-5">
-          <div class="flex-shrink-0">
-            <el-avatar :size="32" style="background: #67c23a">AI</el-avatar>
+          <div class="px-11 mb-5">
+            <div class="px-4 py-3 rounded-xl bg-gray-100 inline-flex items-center">
+              <el-icon class="is-loading"><Loading /></el-icon>
+              <span class="ml-2 text-gray-500">正在生成...</span>
+            </div>
           </div>
-          <div class="px-4 py-3 rounded-xl bg-gray-100">
+        </template>
+
+        <div v-if="isLoading && !chatStore.isStreaming && currentSession?.messages.length === 0 && pendingUserMessage" class="px-11 mb-5">
+          <div class="px-4 py-3 rounded-xl bg-gray-100 inline-flex items-center">
             <el-icon class="is-loading"><Loading /></el-icon>
             <span class="ml-2 text-gray-500">正在生成...</span>
           </div>
         </div>
       </template>
-      <div v-else-if="isLoading && pendingUserMessage" class="flex flex-col gap-5">
+
+      <div v-else-if="isLoading && pendingUserMessage" class="flex flex-col gap-3">
         <div class="flex gap-3 flex-row-reverse">
           <div class="flex-shrink-0">
             <el-avatar :size="32" style="background: #409eff">U</el-avatar>
@@ -128,11 +130,8 @@
             @stage-click="handleStageClick"
           />
         </div>
-        <div v-else class="flex gap-3">
-          <div class="flex-shrink-0">
-            <el-avatar :size="32" style="background: #67c23a">AI</el-avatar>
-          </div>
-          <div class="px-4 py-3 rounded-xl bg-gray-100">
+        <div v-else class="px-11">
+          <div class="px-4 py-3 rounded-xl bg-gray-100 inline-flex items-center">
             <el-icon class="is-loading"><Loading /></el-icon>
             <span class="ml-2 text-gray-500">正在生成...</span>
           </div>
@@ -196,11 +195,15 @@ const lastAssistantMessageId = computed(() => {
   const msgs = currentSession.value?.messages || []
   for (let i = msgs.length - 1; i >= 0; i--) {
     if (msgs[i].role === 'assistant') {
-      return msgs[i].id
+      return { id: msgs[i].id, index: i }
     }
   }
   return null
 })
+
+function isLastAssistantMessage(index: number): boolean {
+  return lastAssistantMessageId.value?.index === index
+}
 
 function stagesToProgressStates(stages: any): StageProgressState[] {
   const hasInitial = INITIAL_STAGE_KEYS.some(k => stages?.[k])
@@ -234,6 +237,11 @@ const persistedStageProgresses = computed(() => {
   if (!lastAssistant?.stages) return []
   return stagesToProgressStates(lastAssistant.stages)
 })
+
+function messageProgresses(message: { stages?: any }): StageProgressState[] {
+  if (!message.stages) return []
+  return stagesToProgressStates(message.stages)
+}
 
 const currentSession = computed(() => chatStore.currentSession)
 const isLoading = computed(() => chatStore.isLoading)
@@ -282,6 +290,9 @@ function scrollToBottom() {
 function buildCallbacks(sessionId: string): SSECallbacks {
   return {
     onStageStart(event) {
+      if (!chatStore.currentTaskId) {
+        chatStore.currentTaskId = event.taskId
+      }
       chatStore.updateStageStatus(event.stage, 'running', {
         progressMessage: '',
       })
@@ -317,7 +328,7 @@ function buildCallbacks(sessionId: string): SSECallbacks {
 
     async onDone(event) {
       chatStore.isStreaming = false
-      chatStore.abortController = null
+      chatStore.currentTaskId = null
 
       if (event.files) {
         processFilesToProject(event.files, chatStore.currentSession?.componentLib)
@@ -346,7 +357,7 @@ function buildCallbacks(sessionId: string): SSECallbacks {
 
     onError(event) {
       chatStore.isStreaming = false
-      chatStore.abortController = null
+      chatStore.currentTaskId = null
       chatStore.setLoading(false)
       pendingUserMessage.value = ''
 
@@ -362,15 +373,33 @@ function buildCallbacks(sessionId: string): SSECallbacks {
       ElMessage.error(`生成失败：${event.message}`)
       scrollToBottom()
     },
+
+    onCancelled(event) {
+      chatStore.isStreaming = false
+      chatStore.currentTaskId = null
+      chatStore.setLoading(false)
+      pendingUserMessage.value = ''
+
+      chatStore.addMessageLocal(sessionId, {
+        role: 'assistant',
+        content: '已取消生成',
+        stages: event.stages as any,
+        failedStep: event.cancelledAtStep,
+      })
+
+      chatStore.loadSession(sessionId)
+
+      ElMessage.info('已取消生成')
+      scrollToBottom()
+    },
   }
 }
 
 async function runGeneration(
   stageNames: string[],
-  execute: (callbacks: SSECallbacks, signal: AbortSignal) => Promise<void>,
+  execute: (callbacks: SSECallbacks) => Promise<void>,
 ) {
-  const controller = new AbortController()
-  chatStore.abortController = controller
+  chatStore.currentTaskId = null
   chatStore.isStreaming = true
   chatStore.setLoading(true)
   chatStore.resetStageProgresses(stageNames)
@@ -378,15 +407,11 @@ async function runGeneration(
   const callbacks = buildCallbacks(chatStore.currentSessionId!)
 
   try {
-    await execute(callbacks, controller.signal)
+    await execute(callbacks)
   } catch (error) {
-    if ((error as Error).name === 'AbortError') {
-      ElMessage.info('已取消生成')
-    } else {
-      ElMessage.error('生成失败: ' + (error as Error).message)
-    }
+    ElMessage.error('生成失败: ' + (error as Error).message)
     chatStore.isStreaming = false
-    chatStore.abortController = null
+    chatStore.currentTaskId = null
   } finally {
     chatStore.setLoading(false)
     pendingUserMessage.value = ''
@@ -426,7 +451,7 @@ async function sendMessage() {
       : ['iteration']
 
     if (isNewSession) {
-      await runGeneration(stageNames, (callbacks, signal) =>
+      await runGeneration(stageNames, (callbacks) =>
         generateInitialStream(
           {
             prompt: message,
@@ -436,11 +461,10 @@ async function sendMessage() {
             attachments: attachmentsToSend,
           },
           callbacks,
-          signal,
         ),
       )
     } else {
-      await runGeneration(stageNames, (callbacks, signal) =>
+      await runGeneration(stageNames, (callbacks) =>
         generateIterateStream(
           {
             prompt: message,
@@ -448,7 +472,6 @@ async function sendMessage() {
             files: currentSession.value!.files!,
           },
           callbacks,
-          signal,
         ),
       )
     }
@@ -465,7 +488,7 @@ async function handleRetryFromStage(stage: number) {
   const firstUserMessage = session.messages.find(m => m.role === 'user')
   if (!firstUserMessage) return
 
-  await runGeneration([...INITIAL_STAGE_KEYS], (callbacks, signal) =>
+  await runGeneration([...INITIAL_STAGE_KEYS], (callbacks) =>
     generateInitialStream(
       {
         prompt: firstUserMessage.content,
@@ -475,7 +498,6 @@ async function handleRetryFromStage(stage: number) {
         fromStep: stage,
       },
       callbacks,
-      signal,
     ),
   )
 }
@@ -495,56 +517,5 @@ function formatTime(date: Date): string {
   display: flex;
   flex-direction: column;
   justify-content: center;
-}
-
-.step-timeline {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.step-item {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 12px;
-  color: #606266;
-  background: #f0f2f5;
-  border-radius: 4px;
-  padding: 2px 8px;
-}
-
-.step-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-
-.step-dot--success {
-  background: #67c23a;
-}
-
-.step-dot--cached {
-  background: #67c23a;
-}
-
-.step-dot--skipped {
-  background: #909399;
-}
-
-.step-dot--failed {
-  background: #f56c6c;
-}
-
-.step-label {
-  white-space: nowrap;
-}
-
-.step-duration {
-  color: #909399;
-  font-size: 11px;
-  margin-left: 2px;
 }
 </style>

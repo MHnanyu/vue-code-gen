@@ -40,6 +40,7 @@ export interface ChatMessage {
 export interface StageStartEvent {
   stage: number
   stageName: string
+  taskId: string
   isRetry?: boolean
   timestamp: string
 }
@@ -80,6 +81,12 @@ export interface ErrorEvent {
   code: number
   message: string
   failedStep: number | null
+  stages: Record<string, StageInfo>
+  timestamp: string
+}
+
+export interface CancelledEvent {
+  cancelledAtStep: number
   stages: Record<string, StageInfo>
   timestamp: string
 }

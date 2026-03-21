@@ -222,27 +222,27 @@ export type { SSECallbacks }
 export function generateInitialStream(
   params: GenerateInitialRequest,
   callbacks: SSECallbacks,
-  signal?: AbortSignal,
 ): Promise<void> {
   return fetchSSEStream(
     '/api/generate/initial/stream',
     params as unknown as Record<string, unknown>,
     callbacks,
-    signal,
   )
 }
 
 export function generateIterateStream(
   params: GenerateIterateRequest,
   callbacks: SSECallbacks,
-  signal?: AbortSignal,
 ): Promise<void> {
   return fetchSSEStream(
     '/api/generate/iterate/stream',
     params as unknown as Record<string, unknown>,
     callbacks,
-    signal,
   )
+}
+
+export async function cancelGeneration(taskId: string): Promise<void> {
+  await fetch(`${API_BASE}/api/generate/cancel?taskId=${taskId}`, { method: 'POST' })
 }
 
 export async function fetchStageFile(filePath: string): Promise<string> {
