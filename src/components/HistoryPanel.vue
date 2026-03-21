@@ -49,7 +49,7 @@
                 size="small"
                 :type="item.status === 'success' || item.status === 'cached' ? 'success' : item.status === 'failed' ? 'danger' : item.status === 'skipped' ? 'warning' : 'info'"
               >
-                {{ stageNameMap[item.name] || item.name }}
+                {{ STAGE_NAME_MAP[item.name] || item.name }}
               </el-tag>
             </div>
           </div>
@@ -74,6 +74,8 @@ import { computed, ref, nextTick } from 'vue'
 import { ElMessageBox } from 'element-plus'
 import { Plus, ChatDotRound, Delete, DArrowLeft } from '@element-plus/icons-vue'
 import { useChatStore } from '@/stores/chat'
+import { apiFilesToProjectFiles, filterUserFiles } from '@/utils/files'
+import { STAGE_NAME_MAP, INITIAL_STAGE_KEYS } from '@/constants/stages'
 import type { ChatSession } from '@/types'
 
 const emit = defineEmits<{
@@ -86,14 +88,6 @@ const chatStore = useChatStore()
 const sortedSessions = computed(() => chatStore.sortedSessions)
 const currentSessionId = computed(() => chatStore.currentSessionId)
 
-const stageNameMap: Record<string, string> = {
-  attachment: '附件处理',
-  requirement: '需求标准化',
-  generation: '代码生成',
-  optimization: 'UX 优化',
-  iteration: '迭代修改',
-}
-
 function lastAssistantStageSummary(session: ChatSession) {
   const lastAssistant = [...(session.messages || [])]
     .reverse()
@@ -101,9 +95,9 @@ function lastAssistantStageSummary(session: ChatSession) {
   if (!lastAssistant) return []
 
   const stages = lastAssistant.stages
-  const stageOutputs = lastAssistant.stageOutputs || []
+  const stepMessages = lastAssistant.stepMessages || []
 
-  const INITIAL_KEYS = ['attachment', 'requirement', 'generation', 'optimization']
+  const INITIAL_KEYS = INITIAL_STAGE_KEYS
   const hasInitial = INITIAL_KEYS.some(k => stages?.[k])
   const keys = hasInitial ? INITIAL_KEYS : ['iteration']
 
@@ -120,19 +114,12 @@ function lastAssistantStageSummary(session: ChatSession) {
   }
 
   if (result.length === 0) {
-    for (const output of stageOutputs) {
-      result.push({ name: output.stageName, status: output.status })
+    for (const sm of stepMessages) {
+      result.push({ name: sm.stageName, status: sm.status })
     }
   }
 
   return result
-}
-
-function lastAssistantStageOutputs(session: ChatSession) {
-  const lastAssistant = [...(session.messages || [])]
-    .reverse()
-    .find(m => m.role === 'assistant')
-  return lastAssistant?.stageOutputs || []
 }
 
 const editingSessionId = ref<string | null>(null)
@@ -146,19 +133,6 @@ function setInputRef(el: HTMLInputElement | null) {
   }
 }
 
-const SYSTEM_FILE_PATHS = new Set([
-  '/src/main.ts',
-  '/src/App.vue',
-  '/src/style.css',
-  '/public/index.html',
-  '/package.json',
-  '/vite.config.ts',
-])
-
-function filterUserFiles(files: any[]) {
-  return files.filter(f => !SYSTEM_FILE_PATHS.has(f.path))
-}
-
 async function selectSession(id: string) {
   if (editingSessionId.value === id) return
   if (chatStore.currentSessionId === id) return
@@ -169,18 +143,7 @@ async function selectSession(id: string) {
   const session = chatStore.sessions.find(s => s.id === id)
   if (session && session.files && session.files.length > 0) {
     const projectStore = await import('@/stores/project').then(m => m.useProjectStore())
-    const { buildProjectFiles } = await import('@/templates/project-template')
-    const userFiles = filterUserFiles(session.files)
-    const mainPageContent = userFiles[0]?.content || ''
-    const extraFiles = userFiles.slice(1).map((f: any) => ({
-      id: f.id,
-      name: f.name,
-      path: f.path,
-      type: f.type as 'file',
-      language: f.language,
-      content: f.content,
-    }))
-    const projectFiles = buildProjectFiles(mainPageContent, extraFiles, session.componentLib)
+    const projectFiles = apiFilesToProjectFiles(session.files, session.componentLib)
     projectStore.setFiles(projectFiles)
   } else {
     const projectStore = await import('@/stores/project').then(m => m.useProjectStore())

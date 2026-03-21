@@ -57,26 +57,24 @@
               </div>
               {{ message.content }}
             </div>
-            <div v-if="message.stageOutputs?.length && message.role === 'assistant'" class="mt-2">
-              <div class="stage-summary">
-                <el-tag
-                  v-for="output in message.stageOutputs"
-                  :key="output.stage"
-                  :type="output.status === 'success' || output.status === 'cached' ? 'success' : output.status === 'failed' ? 'danger' : output.status === 'skipped' ? 'warning' : 'info'"
-                  size="small"
-                  class="stage-tag"
-                  @click="handleViewStageOutput(message, output)"
+            <div v-if="message.stepMessages?.length && message.role === 'assistant'" class="mt-2">
+              <div class="step-timeline">
+                <div
+                  v-for="step in message.stepMessages"
+                  :key="step.stage"
+                  class="step-item"
                 >
-                  {{ stageNameMap[output.stageName] || output.stageName }}
-                  ({{ output.duration != null ? output.duration.toFixed(1) + 's' : '--' }})
-                </el-tag>
+                  <span class="step-dot" :class="'step-dot--' + step.status"></span>
+                  <span class="step-label">{{ STAGE_NAME_MAP[step.stageName] || step.stageName }}</span>
+                  <span class="step-duration">{{ step.duration != null ? step.duration.toFixed(1) + 's' : '--' }}</span>
+                </div>
               </div>
             </div>
             <div v-if="message.failedStep != null && lastAssistantMessageId === message.id && chatStore.stageProgresses.length === 0 && !chatStore.isStreaming" class="mt-2">
               <div class="text-xs text-red-500">
                 <template v-for="(stage, key) in message.stages" :key="key">
                   <span v-if="stage?.status === 'error' || stage?.status === 'failed'" class="mr-2">
-                    {{ stageNameMap[key as keyof typeof stageNameMap] || key }}: {{ stage?.error }}
+                    {{ STAGE_NAME_MAP[key as keyof typeof STAGE_NAME_MAP] || key }}: {{ stage?.error }}
                   </span>
                 </template>
               </div>
@@ -168,13 +166,14 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
-import { DArrowRight, Loading, Document, RefreshRight } from '@element-plus/icons-vue'
+import { DArrowRight, Loading, Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useChatStore } from '@/stores/chat'
 import { useProjectStore } from '@/stores/project'
 import { generateInitialStream, generateIterateStream, type ApiFile, type Attachment, type SSECallbacks, API_BASE } from '@/api'
-import { buildProjectFiles } from '@/templates/project-template'
-import type { ProjectFile, ChatMessage, StageOutput, StageProgressState } from '@/types'
+import { apiFilesToProjectFiles, filterUserFiles } from '@/utils/files'
+import { STAGE_NAME_MAP, INITIAL_STAGE_KEYS } from '@/constants/stages'
+import type { StageProgressState } from '@/types'
 import StageProgress from '@/components/StageProgress.vue'
 
 const props = defineProps<{
@@ -182,7 +181,6 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  generated: []
   'toggle-history': []
 }>()
 
@@ -203,16 +201,6 @@ const lastAssistantMessageId = computed(() => {
   }
   return null
 })
-
-const stageNameMap: Record<string, string> = {
-  attachment: '附件处理',
-  requirement: '需求标准化',
-  generation: '代码生成',
-  optimization: 'UX优化',
-  iteration: '迭代修改',
-}
-
-const INITIAL_STAGE_KEYS = ['attachment', 'requirement', 'generation', 'optimization']
 
 function stagesToProgressStates(stages: any): StageProgressState[] {
   const hasInitial = INITIAL_STAGE_KEYS.some(k => stages?.[k])
@@ -256,31 +244,8 @@ const placeholder = computed(() =>
     : '输入您的需求，开始生成代码...'
 )
 
-const SYSTEM_FILE_PATHS = new Set([
-  '/src/main.ts',
-  '/src/App.vue',
-  '/src/style.css',
-  '/public/index.html',
-  '/package.json',
-  '/vite.config.ts',
-])
-
-function filterSystemFiles(files: ApiFile[]): ApiFile[] {
-  return files.filter(f => !SYSTEM_FILE_PATHS.has(f.path))
-}
-
 function processFilesToProject(files: ApiFile[], componentLib?: string): void {
-  const userFiles = filterSystemFiles(files)
-  const mainPageContent = userFiles[0]?.content || ''
-  const extraFiles: ProjectFile[] = userFiles.slice(1).map((f) => ({
-    id: f.id,
-    name: f.name,
-    path: f.path,
-    type: f.type as 'file',
-    language: f.language as ProjectFile['language'],
-    content: f.content,
-  }))
-  const projectFiles = buildProjectFiles(mainPageContent, extraFiles, componentLib as any)
+  const projectFiles = apiFilesToProjectFiles(files, componentLib as any)
   projectStore.setFiles(projectFiles)
 }
 
@@ -314,10 +279,7 @@ function scrollToBottom() {
   })
 }
 
-function buildCallbacks(
-  sessionId: string,
-  _isNewSession: boolean,
-): SSECallbacks {
+function buildCallbacks(sessionId: string): SSECallbacks {
   return {
     onStageStart(event) {
       chatStore.updateStageStatus(event.stage, 'running', {
@@ -334,6 +296,7 @@ function buildCallbacks(
     onStageComplete(event) {
       chatStore.updateStageStatus(event.stage, event.status, {
         duration: event.duration,
+        progressMessage: event.message || undefined,
       })
 
       if (event.outputType === 'markdown' && event.outputPreview) {
@@ -358,7 +321,7 @@ function buildCallbacks(
 
       if (event.files) {
         processFilesToProject(event.files, chatStore.currentSession?.componentLib)
-        chatStore.updateSessionFiles(sessionId, filterSystemFiles(event.files))
+        chatStore.updateSessionFiles(sessionId, filterUserFiles(event.files))
       }
 
       chatStore.addMessageLocal(sessionId, {
@@ -366,6 +329,7 @@ function buildCallbacks(
         content: event.message,
         stages: event.stages as any,
         failedStep: event.failedStep,
+        stepMessages: event.stepMessages,
       })
 
       await chatStore.loadSession(sessionId)
@@ -378,7 +342,6 @@ function buildCallbacks(
 
       pendingUserMessage.value = ''
       scrollToBottom()
-      emit('generated')
     },
 
     onError(event) {
@@ -398,75 +361,24 @@ function buildCallbacks(
 
       ElMessage.error(`生成失败：${event.message}`)
       scrollToBottom()
-      emit('generated')
     },
   }
 }
 
-async function sendMessage() {
-  const message = inputMessage.value.trim()
-  if (!message || isLoading.value || chatStore.isStreaming) return
-
-  inputMessage.value = ''
-  let sessionId = chatStore.currentSessionId
-  if (!sessionId) {
-    sessionId = await chatStore.createSessionRemote(message)
-    if (!sessionId) {
-      return
-    }
-  }
-
-  const attachmentsToSend = currentAttachments.value.length > 0 ? [...currentAttachments.value] : undefined
-  currentAttachments.value = []
-  
-  pendingUserMessage.value = message
-  scrollToBottom()
+async function runGeneration(
+  stageNames: string[],
+  execute: (callbacks: SSECallbacks, signal: AbortSignal) => Promise<void>,
+) {
+  const controller = new AbortController()
+  chatStore.abortController = controller
+  chatStore.isStreaming = true
   chatStore.setLoading(true)
+  chatStore.resetStageProgresses(stageNames)
+
+  const callbacks = buildCallbacks(chatStore.currentSessionId!)
 
   try {
-    await chatStore.addMessageRemote(sessionId, { 
-      role: 'user', 
-      content: message, 
-      attachments: attachmentsToSend 
-    })
-    
-    const hasExistingFiles = currentSession.value?.files && currentSession.value.files.length > 0
-    const isNewSession = !hasExistingFiles
-
-    const controller = new AbortController()
-    chatStore.abortController = controller
-    chatStore.isStreaming = true
-
-    const stageNames = isNewSession
-      ? ['attachment', 'requirement', 'generation', 'optimization']
-      : ['iteration']
-    chatStore.resetStageProgresses(stageNames)
-
-    const callbacks = buildCallbacks(sessionId!, isNewSession)
-
-    if (isNewSession) {
-      await generateInitialStream(
-        {
-          prompt: message,
-          sessionId,
-          debug: false,
-          componentLib: currentSession.value?.componentLib,
-          attachments: attachmentsToSend,
-        },
-        callbacks,
-        controller.signal,
-      )
-    } else {
-      await generateIterateStream(
-        {
-          prompt: message,
-          sessionId,
-          files: currentSession.value!.files!,
-        },
-        callbacks,
-        controller.signal,
-      )
-    }
+    await execute(callbacks, controller.signal)
   } catch (error) {
     if ((error as Error).name === 'AbortError') {
       ElMessage.info('已取消生成')
@@ -479,7 +391,69 @@ async function sendMessage() {
     chatStore.setLoading(false)
     pendingUserMessage.value = ''
     scrollToBottom()
-    emit('generated')
+  }
+}
+
+async function sendMessage() {
+  const message = inputMessage.value.trim()
+  if (!message || isLoading.value || chatStore.isStreaming) return
+
+  inputMessage.value = ''
+  let sessionId = chatStore.currentSessionId
+  if (!sessionId) {
+    sessionId = await chatStore.createSessionRemote(message)
+    if (!sessionId) return
+  }
+
+  const attachmentsToSend = currentAttachments.value.length > 0 ? [...currentAttachments.value] : undefined
+  currentAttachments.value = []
+
+  pendingUserMessage.value = message
+  scrollToBottom()
+
+  try {
+    await chatStore.addMessageRemote(sessionId, {
+      role: 'user',
+      content: message,
+      attachments: attachmentsToSend,
+    })
+
+    const hasExistingFiles = currentSession.value?.files && currentSession.value.files.length > 0
+    const isNewSession = !hasExistingFiles
+
+    const stageNames = isNewSession
+      ? [...INITIAL_STAGE_KEYS]
+      : ['iteration']
+
+    if (isNewSession) {
+      await runGeneration(stageNames, (callbacks, signal) =>
+        generateInitialStream(
+          {
+            prompt: message,
+            sessionId,
+            debug: false,
+            componentLib: currentSession.value?.componentLib,
+            attachments: attachmentsToSend,
+          },
+          callbacks,
+          signal,
+        ),
+      )
+    } else {
+      await runGeneration(stageNames, (callbacks, signal) =>
+        generateIterateStream(
+          {
+            prompt: message,
+            sessionId,
+            files: currentSession.value!.files!,
+          },
+          callbacks,
+          signal,
+        ),
+      )
+    }
+  } catch {
+    // errors handled by runGeneration
   }
 }
 
@@ -491,18 +465,8 @@ async function handleRetryFromStage(stage: number) {
   const firstUserMessage = session.messages.find(m => m.role === 'user')
   if (!firstUserMessage) return
 
-  const controller = new AbortController()
-  chatStore.abortController = controller
-  chatStore.isStreaming = true
-  chatStore.setLoading(true)
-
-  const stageNames = ['attachment', 'requirement', 'generation', 'optimization']
-  chatStore.resetStageProgresses(stageNames)
-
-  const callbacks = buildCallbacks(sessionId, true)
-
-  try {
-    await generateInitialStream(
+  await runGeneration([...INITIAL_STAGE_KEYS], (callbacks, signal) =>
+    generateInitialStream(
       {
         prompt: firstUserMessage.content,
         sessionId,
@@ -511,49 +475,13 @@ async function handleRetryFromStage(stage: number) {
         fromStep: stage,
       },
       callbacks,
-      controller.signal,
-    )
-  } catch (error) {
-    if ((error as Error).name === 'AbortError') {
-      ElMessage.info('已取消生成')
-    } else {
-      ElMessage.error('重试失败: ' + (error as Error).message)
-    }
-    chatStore.isStreaming = false
-    chatStore.abortController = null
-  } finally {
-    chatStore.setLoading(false)
-    scrollToBottom()
-    emit('generated')
-  }
+      signal,
+    ),
+  )
 }
 
 function handleStageClick(stage: StageProgressState) {
   chatStore.setActiveStageTab(stage.stageName)
-}
-
-async function handleViewStageOutput(
-  assistantMsg: ChatMessage,
-  output: StageOutput,
-) {
-  const session = currentSession.value
-  if (!session) {
-    chatStore.setActiveStageTab(output.stageName)
-    return
-  }
-
-  const allOutputs = session.messages.flatMap(m => m.stageOutputs || [])
-  const sameNameOutputs = allOutputs.filter(o => o.stageName === output.stageName)
-
-  let key: string
-  if (sameNameOutputs.length > 1) {
-    const idx = sameNameOutputs.indexOf(output)
-    key = `${output.stageName}_${idx + 1}`
-  } else {
-    key = output.stageName
-  }
-
-  chatStore.setActiveStageTab(key)
 }
 
 function formatTime(date: Date): string {
@@ -569,18 +497,54 @@ function formatTime(date: Date): string {
   justify-content: center;
 }
 
-.stage-summary {
+.step-timeline {
   display: flex;
   flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.step-item {
+  display: inline-flex;
+  align-items: center;
   gap: 4px;
+  font-size: 12px;
+  color: #606266;
+  background: #f0f2f5;
+  border-radius: 4px;
+  padding: 2px 8px;
 }
 
-.stage-tag {
-  cursor: pointer;
-  transition: opacity 0.2s;
+.step-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
-.stage-tag:hover {
-  opacity: 0.8;
+.step-dot--success {
+  background: #67c23a;
+}
+
+.step-dot--cached {
+  background: #67c23a;
+}
+
+.step-dot--skipped {
+  background: #909399;
+}
+
+.step-dot--failed {
+  background: #f56c6c;
+}
+
+.step-label {
+  white-space: nowrap;
+}
+
+.step-duration {
+  color: #909399;
+  font-size: 11px;
+  margin-left: 2px;
 }
 </style>

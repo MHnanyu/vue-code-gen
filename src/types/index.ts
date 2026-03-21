@@ -1,11 +1,4 @@
-import type { ApiFile } from '@/api'
-
-export interface Attachment {
-  id: string
-  url: string
-  name: string
-  type: 'image' | 'text' | 'markdown'
-}
+import type { ApiFile, Attachment } from '@/api'
 
 export interface StageInfo {
   status: 'success' | 'skipped' | 'error' | 'failed'
@@ -21,15 +14,16 @@ export interface Stages {
   optimization?: StageInfo
 }
 
-export interface StageOutput {
+export interface StepMessage {
   stage: number
   stageName: string
-  status: 'success' | 'failed' | 'skipped' | 'cached'
+  message: string
+  status: 'success' | 'skipped' | 'failed' | 'cached'
   duration: number | null
-  outputType: 'markdown' | 'json' | 'vue' | null
-  filePath: string | null
-  vueDirPath: string | null
-  error: string | null
+  outputPreview?: string | null
+  outputType?: 'markdown' | 'json' | 'vue' | null
+  filePath?: string | null
+  vueDirPath?: string | null
 }
 
 export interface ChatMessage {
@@ -40,7 +34,7 @@ export interface ChatMessage {
   attachments?: Attachment[]
   failedStep?: number | null
   stages?: Stages | null
-  stageOutputs?: StageOutput[] | null
+  stepMessages?: StepMessage[] | null
 }
 
 export interface StageStartEvent {
@@ -69,6 +63,7 @@ export interface StageCompleteEvent {
   outputPreview: string | null
   files: ApiFile[] | null
   error: string | null
+  message?: string
   timestamp: string
 }
 
@@ -77,6 +72,7 @@ export interface DoneEvent {
   message: string
   stages: Record<string, StageInfo>
   failedStep: number | null
+  stepMessages?: StepMessage[] | null
   timestamp: string
 }
 

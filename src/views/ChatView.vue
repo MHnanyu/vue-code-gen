@@ -17,7 +17,6 @@
         :style="{ width: chatPanelWidth + 'px' }"
       >
         <ChatPanel
-          ref="chatPanelRef"
           :history-collapsed="isHistoryCollapsed"
           @toggle-history="toggleHistory"
         />
@@ -48,6 +47,7 @@ import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import { useProjectStore } from '@/stores/project'
+import { apiFilesToProjectFiles } from '@/utils/files'
 import HistoryPanel from '@/components/HistoryPanel.vue'
 import ChatPanel from '@/components/ChatPanel.vue'
 import ResultPanel from '@/components/ResultPanel.vue'
@@ -57,8 +57,6 @@ const router = useRouter()
 const chatStore = useChatStore()
 const projectStore = useProjectStore()
 
-const chatPanelRef = ref<InstanceType<typeof ChatPanel> | null>(null)
-
 const isHistoryCollapsed = ref(false)
 const chatPanelWidth = ref(450)
 const isResizing = ref(false)
@@ -66,17 +64,13 @@ const isReady = ref(false)
 let startX = 0
 let startWidth = 0
 
-const SYSTEM_FILE_PATHS = new Set([
-  '/src/main.ts',
-  '/src/App.vue',
-  '/src/style.css',
-  '/public/index.html',
-  '/package.json',
-  '/vite.config.ts',
-])
-
-function filterUserFiles(files: any[]) {
-  return files.filter(f => !SYSTEM_FILE_PATHS.has(f.path))
+function loadSessionProjectFiles(session: { files?: any[]; componentLib?: any }) {
+  if (session.files && session.files.length > 0) {
+    const projectFiles = apiFilesToProjectFiles(session.files, session.componentLib)
+    projectStore.setFiles(projectFiles)
+  } else {
+    projectStore.clearProject()
+  }
 }
 
 onMounted(async () => {
@@ -88,20 +82,8 @@ onMounted(async () => {
     await chatStore.loadSession(sessionId)
     
     const session = chatStore.sessions.find(s => s.id === sessionId)
-    if (session && session.files && session.files.length > 0) {
-      const { buildProjectFiles } = await import('@/templates/project-template')
-      const userFiles = filterUserFiles(session.files)
-      const mainPageContent = userFiles[0]?.content || ''
-      const extraFiles = userFiles.slice(1).map((f) => ({
-        id: f.id,
-        name: f.name,
-        path: f.path,
-        type: f.type as 'file',
-        language: f.language as any,
-        content: f.content,
-      }))
-      const projectFiles = buildProjectFiles(mainPageContent, extraFiles, session.componentLib)
-      projectStore.setFiles(projectFiles)
+    if (session) {
+      loadSessionProjectFiles(session)
     } else {
       projectStore.clearProject()
     }
@@ -136,23 +118,7 @@ watch(() => chatStore.currentSessionId, async (id) => {
     return
   }
   
-  if (session.files && session.files.length > 0) {
-    const { buildProjectFiles } = await import('@/templates/project-template')
-    const userFiles = filterUserFiles(session.files)
-    const mainPageContent = userFiles[0]?.content || ''
-    const extraFiles = userFiles.slice(1).map((f) => ({
-      id: f.id,
-      name: f.name,
-      path: f.path,
-      type: f.type as 'file',
-      language: f.language as any,
-      content: f.content,
-    }))
-    const projectFiles = buildProjectFiles(mainPageContent, extraFiles, session.componentLib)
-    projectStore.setFiles(projectFiles)
-  } else {
-    projectStore.clearProject()
-  }
+  loadSessionProjectFiles(session)
 })
 
 onUnmounted(() => {

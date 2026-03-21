@@ -11,24 +11,12 @@ export const useProjectStore = defineStore('project', () => {
 
   const editableFiles = computed(() => filterEditableFiles(files.value))
 
-  const readonlyFiles = computed(() => filterReadonlyFiles(files.value))
-
   function filterEditableFiles(fileList: ProjectFile[]): ProjectFile[] {
     return fileList
       .filter(f => !f.readonly)
       .map(f => ({
         ...f,
         children: f.children ? filterEditableFiles(f.children) : undefined
-      }))
-      .filter(f => f.type === 'file' || (f.children && f.children.length > 0))
-  }
-
-  function filterReadonlyFiles(fileList: ProjectFile[]): ProjectFile[] {
-    return fileList
-      .filter(f => f.readonly)
-      .map(f => ({
-        ...f,
-        children: f.children ? filterReadonlyFiles(f.children) : undefined
       }))
       .filter(f => f.type === 'file' || (f.children && f.children.length > 0))
   }
@@ -80,10 +68,6 @@ export const useProjectStore = defineStore('project', () => {
     files.value = []
     selectedFileId.value = null
     isModified.value = false
-  }
-
-  function markModified() {
-    isModified.value = true
   }
 
   function clearModified() {
@@ -152,12 +136,10 @@ export const useProjectStore = defineStore('project', () => {
     isModified,
     selectedFile,
     editableFiles,
-    readonlyFiles,
     setFiles,
     selectFile,
     updateFileContent,
     clearProject,
-    markModified,
     clearModified,
     addFile,
     deleteFile,

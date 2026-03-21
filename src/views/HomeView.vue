@@ -109,7 +109,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { useGeneratorStore } from '@/stores/generator'
 import { useChatStore } from '@/stores/chat'
 import { uploadFiles as apiUploadFiles, type Attachment } from '@/api'
 import type { ComponentLib } from '@/types'
@@ -117,11 +116,10 @@ import type { UploadFile, UploadUserFile } from 'element-plus'
 import { Paperclip, Picture, Document, Close } from '@element-plus/icons-vue'
 
 const router = useRouter()
-const store = useGeneratorStore()
 const chatStore = useChatStore()
 
 const prompt = ref('')
-const selectedLib = ref('aui')
+const selectedLib = ref('ElementUI')
 const loading = ref(false)
 const imageList = ref<UploadUserFile[]>([])
 const attachList = ref<UploadUserFile[]>([])
@@ -183,8 +181,6 @@ async function handleGenerate() {
 
     const finalPrompt = prompt.value.trim() || `根据上传的${attachments.length}个文件生成页面`
 
-    store.setPrompt(finalPrompt)
-    store.clearFiles()
     chatStore.setPendingPrompt(finalPrompt)
     chatStore.setPendingAttachments(attachments)
 

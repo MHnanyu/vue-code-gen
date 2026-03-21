@@ -37,11 +37,11 @@ export const useChatStore = defineStore('chat', () => {
     return stageProgresses.value.find(s => s.status === 'running') ?? null
   })
 
-  const hasStageOutputs = computed(() => {
+  const hasStepMessages = computed(() => {
     const session = currentSession.value
     if (!session) return false
     return session.messages.some(
-      m => m.role === 'assistant' && m.stageOutputs && m.stageOutputs.length > 0,
+      m => m.role === 'assistant' && m.stepMessages && m.stepMessages.length > 0,
     )
   })
 
@@ -89,6 +89,7 @@ export const useChatStore = defineStore('chat', () => {
   function setActiveStageTab(stageName: string | null): void {
     if (activeStageTab.value === stageName && stageName !== null) {
       activeStageTab.value = null
+      return
     }
     activeStageTab.value = stageName
   }
@@ -130,16 +131,20 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
+  function removeSessionLocally(id: string) {
+    const index = sessions.value.findIndex(s => s.id === id)
+    if (index > -1) {
+      sessions.value.splice(index, 1)
+      if (currentSessionId.value === id) {
+        currentSessionId.value = sessions.value[0]?.id || null
+      }
+    }
+  }
+
   async function deleteSessionRemote(id: string) {
     try {
       await apiDeleteSession(id)
-      const index = sessions.value.findIndex(s => s.id === id)
-      if (index > -1) {
-        sessions.value.splice(index, 1)
-        if (currentSessionId.value === id) {
-          currentSessionId.value = sessions.value[0]?.id || null
-        }
-      }
+      removeSessionLocally(id)
     } catch (error) {
       console.error('Failed to delete session:', error)
     }
@@ -214,16 +219,6 @@ export const useChatStore = defineStore('chat', () => {
     }
   }
 
-  function deleteSession(id: string) {
-    const index = sessions.value.findIndex(s => s.id === id)
-    if (index > -1) {
-      sessions.value.splice(index, 1)
-      if (currentSessionId.value === id) {
-        currentSessionId.value = sessions.value[0]?.id || null
-      }
-    }
-  }
-
   function setLoading(value: boolean) {
     isLoading.value = value
   }
@@ -262,13 +257,12 @@ export const useChatStore = defineStore('chat', () => {
     stagePreviewMap,
     activeStageTab,
     currentStreamingStage,
-    hasStageOutputs,
+    hasStepMessages,
     createSession,
     createSessionRemote,
     selectSession,
     addMessageLocal,
     addMessageRemote,
-    deleteSession,
     deleteSessionRemote,
     updateSessionTitleRemote,
     loadSessions,

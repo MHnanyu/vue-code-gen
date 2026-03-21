@@ -62,8 +62,8 @@
               <el-icon><Timer /></el-icon>
               {{ stage.duration.toFixed(1) }}s
             </span>
-            <span v-if="stage.status === 'running'" class="stage-progress-text">
-              {{ stage.progressMessage || '处理中...' }}
+            <span v-if="stage.progressMessage" class="stage-progress-text" :class="{ 'text-success': stage.status === 'success' || stage.status === 'cached' }">
+              {{ stage.progressMessage }}
             </span>
           </div>
           <div v-if="stage.status === 'failed'" class="stage-error">
@@ -100,14 +100,7 @@
 import { ref, computed, watch } from 'vue'
 import { ArrowRight, Check, Close, Loading, WarningFilled, Timer, SemiSelect } from '@element-plus/icons-vue'
 import type { StageProgressState } from '@/types'
-
-const STAGE_NAME_MAP: Record<string, string> = {
-  attachment: '附件处理',
-  requirement: '需求标准化',
-  generation: '代码生成',
-  optimization: 'UX 优化',
-  iteration: '迭代修改',
-}
+import { STAGE_NAME_MAP } from '@/constants/stages'
 
 const props = defineProps<{
   stages: StageProgressState[]
@@ -144,12 +137,6 @@ watch(() => props.isStreaming, (val) => {
 })
 
 const collapsed = ref(props.isStreaming ? false : !hasFailure.value)
-
-watch(() => props.isStreaming, (val) => {
-  if (val) {
-    collapsed.value = false
-  }
-})
 
 watch(() => props.stages, () => {
   if (!props.isStreaming) {
@@ -383,6 +370,10 @@ function handleStageClick(stage: StageProgressState) {
 .stage-progress-text {
   font-size: 11px;
   color: #409eff;
+}
+
+.stage-progress-text.text-success {
+  color: #67c23a;
 }
 
 .stage-error {

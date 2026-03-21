@@ -1,4 +1,4 @@
-import type { ProjectFile, ComponentLib, Stages } from '@/types'
+import type { ProjectFile, ComponentLib, Stages, StepMessage } from '@/types'
 
 export const API_BASE = 'http://localhost:8000'
 
@@ -46,16 +46,7 @@ interface ApiMessage {
   attachments?: Attachment[]
   failedStep?: number | null
   stages?: Stages | null
-  stageOutputs?: Array<{
-    stage: number
-    stageName: string
-    status: 'success' | 'failed' | 'skipped' | 'cached'
-    duration: number | null
-    outputType: 'markdown' | 'json' | 'vue' | null
-    filePath: string | null
-    vueDirPath: string | null
-    error: string | null
-  }> | null
+  stepMessages?: StepMessage[] | null
 }
 
 interface CreateSessionRequest {
@@ -95,8 +86,11 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return result.data
 }
 
-export async function checkHealth(): Promise<{ status: string; mongodb: string }> {
-  return request('/health')
+export async function createSession(title?: string, componentLib?: ComponentLib): Promise<ApiSession> {
+  return request<ApiSession>('/api/sessions', {
+    method: 'POST',
+    body: JSON.stringify({ title, componentLib } as CreateSessionRequest),
+  })
 }
 
 interface GenerateInitialRequest {
@@ -112,39 +106,6 @@ interface GenerateIterateRequest {
   prompt: string
   sessionId: string
   files: ApiFile[]
-}
-
-interface GenerateInitialResponse {
-  files: ApiFile[]
-  message: string
-  stages?: Stages
-  failedStep?: number | null
-}
-
-interface GenerateIterateResponse {
-  files: ApiFile[]
-  message: string
-}
-
-export async function generateInitial(req: GenerateInitialRequest): Promise<GenerateInitialResponse> {
-  return request('/api/generate/initial', {
-    method: 'POST',
-    body: JSON.stringify(req),
-  })
-}
-
-export async function generateIterate(req: GenerateIterateRequest): Promise<GenerateIterateResponse> {
-  return request('/api/generate/iterate', {
-    method: 'POST',
-    body: JSON.stringify(req),
-  })
-}
-
-export async function createSession(title?: string, componentLib?: ComponentLib): Promise<ApiSession> {
-  return request<ApiSession>('/api/sessions', {
-    method: 'POST',
-    body: JSON.stringify({ title, componentLib } as CreateSessionRequest),
-  })
 }
 
 export async function getSessions(page = 1, pageSize = 20): Promise<SessionListResponse> {
@@ -206,7 +167,7 @@ export function transformApiSession(session: ApiSession) {
       attachments: msg.attachments,
       failedStep: msg.failedStep,
       stages: msg.stages,
-      stageOutputs: msg.stageOutputs,
+      stepMessages: msg.stepMessages,
     })),
     files: session.files,
     componentLib: session.componentLib,

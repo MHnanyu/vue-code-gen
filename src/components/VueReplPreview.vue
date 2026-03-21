@@ -48,7 +48,8 @@ import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
 import { Repl, useStore, useVueImportMap } from '@vue/repl'
 import CodeMirror from '@vue/repl/codemirror-editor'
-import { collectAllFiles } from '@/preview/resolver'
+import { collectAllFiles } from '@/utils/files'
+import { downloadBlob } from '@/utils/download'
 import type { ProjectFile } from '@/types'
 
 
@@ -66,10 +67,6 @@ const props = withDefaults(defineProps<{
   emptyIcon: '📄',
   loadingText: '加载预览中...',
 })
-
-const emit = defineEmits<{
-  ready: []
-}>()
 
 const isReplReady = ref(false)
 const hasFiles = computed(() => props.files.length > 0)
@@ -214,7 +211,6 @@ function syncFilesToRepl() {
 
   replStore.setFiles(newFiles, 'App.vue')
   isReplReady.value = true
-  emit('ready')
 }
 
 function exportStaticHtml() {
@@ -238,13 +234,7 @@ function exportStaticHtml() {
     }
 
     const htmlContent = innerDoc.documentElement.outerHTML
-    const blob = new Blob([htmlContent], { type: 'text/html' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = 'exported-page.html'
-    a.click()
-    URL.revokeObjectURL(url)
+    downloadBlob(htmlContent, 'exported-page.html')
     ElMessage.success('导出成功')
   } catch (error) {
     console.error('Export failed:', error)
