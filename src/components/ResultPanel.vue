@@ -300,14 +300,28 @@ async function ensureStageContentLoaded(key: string) {
   try {
     if (outputType === 'markdown') {
       const content = await fetchStageFile(fetchPath)
-      if (completedStages.value.some(s => s._key === key)) {
+      const stillValid = completedStages.value.some(s => s._key === key)
+      if (stillValid) {
         stageContentCache.value.set(key, { type: 'markdown', content, files: null })
+      }
+      if (!stillValid && key.endsWith('_live')) {
+        const baseKey = key.replace(/_live$/, '')
+        if (!stageContentCache.value.has(baseKey)) {
+          stageContentCache.value.set(baseKey, { type: 'markdown', content, files: null })
+        }
       }
     } else if (outputType === 'vue') {
       const raw = await fetchStageJson<ApiFile[] | { data?: ApiFile[]; files?: ApiFile[] }>(fetchPath)
       const data = Array.isArray(raw) ? raw : (raw.data || raw.files || [])
-      if (completedStages.value.some(s => s._key === key)) {
+      const stillValid = completedStages.value.some(s => s._key === key)
+      if (stillValid) {
         stageContentCache.value.set(key, { type: 'vue', content: null, files: data })
+      }
+      if (!stillValid && key.endsWith('_live')) {
+        const baseKey = key.replace(/_live$/, '')
+        if (!stageContentCache.value.has(baseKey)) {
+          stageContentCache.value.set(baseKey, { type: 'vue', content: null, files: data })
+        }
       }
       if (wasStreaming) {
         projectStore.setFiles(apiFilesToProjectFiles(data, chatStore.currentSession?.componentLib))
@@ -349,11 +363,11 @@ watch(() => chatStore.stageProgresses.map(s => `${s.stageName}:${s.status}`).joi
   if (!activeStageKey.value) return
   const key = activeStageKey.value
   if (stageContentCache.value.has(key)) return
+  if (stageLoadingMap.value.get(key)) return
   const stage = completedStages.value.find(s => s._key === key)
   if (!stage) return
   const progress = chatStore.stageProgresses.find(s => s.stageName === stage.stageName)
   if (progress && progress.status !== 'running' && progress.status !== 'pending') {
-    stageLoadingMap.value.set(key, false)
     await ensureStageContentLoaded(key)
   }
 })
@@ -382,6 +396,17 @@ watch(() => chatStore.hasStepMessages, async (has) => {
       }
     }
 
+    for (const [liveKey, loading] of stageLoadingMap.value) {
+      if (liveKey.endsWith('_live') && loading) {
+        const stageName = liveKey.replace(/_live$/, '')
+        const target = persistedStages.find(s => s.stageName === stageName)
+        if (target && !stageContentCache.value.has(target._key)) {
+          stageLoadingMap.value.set(target._key, true)
+          stageLoadingMap.value.delete(liveKey)
+        }
+      }
+    }
+
     const resolveKey = activeStageKey.value || chatStore.activeStageTab
     if (!resolveKey) return
 
@@ -391,7 +416,7 @@ watch(() => chatStore.hasStepMessages, async (has) => {
       if (newTab) {
         activeStageKey.value = newTab._key
         purgeStaleStageCache()
-        if (!stageContentCache.value.has(newTab._key)) {
+        if (!stageContentCache.value.has(newTab._key) && !stageLoadingMap.value.get(newTab._key)) {
           await ensureStageContentLoaded(newTab._key)
         }
         return
@@ -406,7 +431,9 @@ watch(() => chatStore.hasStepMessages, async (has) => {
       activeTab.value = 'stages'
       activeStageKey.value = target._key
       purgeStaleStageCache()
-      await ensureStageContentLoaded(target._key)
+      if (!stageContentCache.value.has(target._key) && !stageLoadingMap.value.get(target._key)) {
+        await ensureStageContentLoaded(target._key)
+      }
     }
   }
 })
