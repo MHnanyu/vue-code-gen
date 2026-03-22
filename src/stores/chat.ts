@@ -55,6 +55,10 @@ export const useChatStore = defineStore('chat', () => {
     }))
   }
 
+  function setStageProgresses(progresses: StageProgressState[]): void {
+    stageProgresses.value = progresses
+  }
+
   function updateStageStatus(
     stage: number,
     status: StageProgressState['status'],
@@ -273,6 +277,7 @@ export const useChatStore = defineStore('chat', () => {
     clearPendingAttachments,
     updateSessionFiles,
     resetStageProgresses,
+    setStageProgresses,
     updateStageStatus,
     setStagePreview,
     cancelStreaming,

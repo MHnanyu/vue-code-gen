@@ -44,6 +44,7 @@ interface ApiMessage {
   content: string
   timestamp: string
   attachments?: Attachment[]
+  files?: ApiFile[]
   failedStep?: number | null
   stages?: Stages | null
   stepMessages?: StepMessage[] | null
@@ -106,6 +107,7 @@ interface GenerateIterateRequest {
   prompt: string
   sessionId: string
   files: ApiFile[]
+  fromStep?: number | null
 }
 
 export async function getSessions(page = 1, pageSize = 20): Promise<SessionListResponse> {
@@ -165,6 +167,7 @@ export function transformApiSession(session: ApiSession) {
       content: msg.content,
       timestamp: parseDate(msg.timestamp),
       attachments: msg.attachments,
+      files: msg.files,
       failedStep: msg.failedStep,
       stages: msg.stages,
       stepMessages: msg.stepMessages,

@@ -32,6 +32,7 @@ export interface ChatMessage {
   content: string
   timestamp: Date
   attachments?: Attachment[]
+  files?: ApiFile[]
   failedStep?: number | null
   stages?: Stages | null
   stepMessages?: StepMessage[] | null

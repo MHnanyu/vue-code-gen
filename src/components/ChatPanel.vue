@@ -51,16 +51,25 @@
           <template v-else-if="message.role === 'assistant'">
             <div class="mb-3">
               <StageProgress
-                v-if="isLastAssistantMessage(idx) && persistedStageProgresses.length > 0"
+                  v-if="isLastAssistantMessage(idx) && chatStore.isStreaming && chatStore.stageProgresses.length > 0"
+                  :stages="chatStore.stageProgresses"
+                  :is-streaming="true"
+                  :retry-fn="handleRetryFromStage"
+                  :cancel-fn="chatStore.cancelStreaming"
+                  @stage-click="handleStageClick"
+              />
+              <StageProgress
+                v-else-if="isLastAssistantMessage(idx) && persistedStageProgresses.length > 0"
                 :stages="persistedStageProgresses"
                 :is-streaming="false"
-                :retry-fn="chatStore.isStreaming ? undefined : handleRetryFromStage"
+                :retry-fn="chatStore.isStreaming ? undefined : (stage: number) => handleRetryFromStage(stage, message)"
                 @stage-click="(stage: StageProgressState) => handleStageClick(stage, message)"
               />
               <StageProgress
                 v-else-if="message.stages"
                 :stages="messageProgresses(message)"
                 :is-streaming="false"
+                :retry-fn="(stage: number) => handleRetryFromStage(stage, message)"
                 @stage-click="(stage: StageProgressState) => handleStageClick(stage, message)"
               />
             </div>
@@ -71,7 +80,13 @@
               </div>
               <div class="max-w-[80%]">
                 <div class="px-4 py-3 rounded-xl leading-relaxed break-words bg-gray-100">
-                  {{ message.content }}
+                  <template v-if="isLastAssistantMessage(idx) && isRetrying && chatStore.isStreaming">
+                    <el-icon class="is-loading"><Loading /></el-icon>
+                    <span class="ml-1">正在重试...</span>
+                  </template>
+                  <template v-else>
+                    {{ message.content }}
+                  </template>
                 </div>
               </div>
             </div>
@@ -88,7 +103,7 @@
           </template>
         </template>
 
-        <template v-if="chatStore.isStreaming">
+        <template v-if="chatStore.isStreaming && !lastAssistantMessageId">
           <div class="mb-3">
             <StageProgress
               :stages="chatStore.stageProgresses"
@@ -99,9 +114,16 @@
             />
           </div>
           <div class="px-11 mb-5">
-            <div class="px-4 py-3 rounded-xl bg-gray-100 inline-flex items-center">
-              <el-icon class="is-loading"><Loading /></el-icon>
-              <span class="ml-2 text-gray-500">正在生成...</span>
+            <div class="flex gap-3 mb-5">
+              <div class="flex-shrink-0">
+                <el-avatar :size="32" style="background: #67c23a">AI</el-avatar>
+              </div>
+              <div class="max-w-[80%]">
+                <div class="px-4 py-3 rounded-xl bg-gray-100 inline-flex items-center">
+                  <el-icon class="is-loading"><Loading /></el-icon>
+                  <span class="ml-2 text-gray-500">正在生成...</span>
+                </div>
+              </div>
             </div>
           </div>
         </template>
@@ -190,6 +212,7 @@ const inputMessage = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const pendingUserMessage = ref('')
 const currentAttachments = ref<Attachment[]>([])
+const isRetrying = ref(false)
 
 const lastAssistantMessageId = computed(() => {
   const msgs = currentSession.value?.messages || []
@@ -227,6 +250,7 @@ function stagesToProgressStates(stages: any, stepMessages?: any[] | null): Stage
     }
     const status: StageProgressState['status'] =
       s.status === 'success' ? 'success' :
+      s.status === 'cached' ? 'cached' :
       s.status === 'skipped' ? 'skipped' :
       s.status === 'error' || s.status === 'failed' ? 'failed' :
       s.status === 'cancelled' ? 'cancelled' : 'pending'
@@ -302,9 +326,26 @@ function buildCallbacks(sessionId: string): SSECallbacks {
       if (!chatStore.currentTaskId) {
         chatStore.currentTaskId = event.taskId
       }
-      chatStore.updateStageStatus(event.stage, 'running', {
-        progressMessage: '',
-      })
+      if (event.isRetry && chatStore.currentSessionId) {
+        chatStore.loadSession(chatStore.currentSessionId).then(() => {
+          const session = chatStore.currentSession
+          if (session?.files && session.files.length > 0) {
+            processFilesToProject(session.files, session.componentLib)
+          }
+          const lastAssistant = [...session?.messages || []].reverse().find(m => m.role === 'assistant')
+          if (lastAssistant?.stages) {
+            const progressStates = stagesToProgressStates(lastAssistant.stages, lastAssistant.stepMessages)
+            chatStore.setStageProgresses(progressStates)
+          }
+          chatStore.updateStageStatus(event.stage, 'running', {
+            progressMessage: '',
+          })
+        })
+      } else {
+        chatStore.updateStageStatus(event.stage, 'running', {
+          progressMessage: '',
+        })
+      }
     },
 
     onStageProgress(event) {
@@ -412,6 +453,7 @@ async function runGeneration(
   chatStore.isStreaming = true
   chatStore.setLoading(true)
   chatStore.resetStageProgresses(stageNames)
+  chatStore.stagePreviewMap.clear()
 
   const callbacks = buildCallbacks(chatStore.currentSessionId!)
 
@@ -423,6 +465,7 @@ async function runGeneration(
     chatStore.currentTaskId = null
   } finally {
     chatStore.setLoading(false)
+    isRetrying.value = false
     pendingUserMessage.value = ''
     scrollToBottom()
   }
@@ -489,26 +532,58 @@ async function sendMessage() {
   }
 }
 
-async function handleRetryFromStage(stage: number) {
+async function handleRetryFromStage(stage: number, message?: ChatMessage) {
   const sessionId = chatStore.currentSessionId
   const session = chatStore.currentSession
   if (!sessionId || !session || chatStore.isStreaming) return
+  isRetrying.value = true
 
-  const firstUserMessage = session.messages.find(m => m.role === 'user')
-  if (!firstUserMessage) return
+  const msgs = session.messages
+  const lastIdx = msgs.length - 1
+  if (lastIdx >= 0 && msgs[lastIdx].role === 'assistant' && msgs[lastIdx].failedStep != null) {
+    msgs.splice(lastIdx, 1)
+  }
 
-  await runGeneration([...INITIAL_STAGE_KEYS], (callbacks) =>
-    generateInitialStream(
-      {
-        prompt: firstUserMessage.content,
-        sessionId,
-        componentLib: session.componentLib,
-        attachments: firstUserMessage.attachments,
-        fromStep: stage,
-      },
-      callbacks,
-    ),
-  )
+  const msgStages = message?.stages
+  const isIteration = msgStages
+    ? !INITIAL_STAGE_KEYS.some(k => (msgStages as any)?.[k])
+    : chatStore.stageProgresses.length > 0 && !INITIAL_STAGE_KEYS.includes(chatStore.stageProgresses[0].stageName)
+
+  if (isIteration) {
+    const msgIndex = message ? session.messages.indexOf(message) : -1
+    const userMessage = msgIndex >= 0
+      ? session.messages.slice(0, msgIndex).reverse().find(m => m.role === 'user')
+      : session.messages.filter(m => m.role === 'user').at(-1)
+    if (!userMessage) return
+
+    await runGeneration(['iteration'], (callbacks) =>
+      generateIterateStream(
+        {
+          prompt: userMessage.content,
+          sessionId,
+          files: session.files!,
+          fromStep: 0,
+        },
+        callbacks,
+      ),
+    )
+  } else {
+    const firstUserMessage = session.messages.find(m => m.role === 'user')
+    if (!firstUserMessage) return
+
+    await runGeneration([...INITIAL_STAGE_KEYS], (callbacks) =>
+      generateInitialStream(
+        {
+          prompt: firstUserMessage.content,
+          sessionId,
+          componentLib: session.componentLib,
+          attachments: firstUserMessage.attachments,
+          fromStep: stage,
+        },
+        callbacks,
+      ),
+    )
+  }
 }
 
 function handleStageClick(stage: StageProgressState, message?: ChatMessage) {
