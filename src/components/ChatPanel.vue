@@ -213,6 +213,7 @@ const messagesContainer = ref<HTMLElement | null>(null)
 const pendingUserMessage = ref('')
 const currentAttachments = ref<Attachment[]>([])
 const isRetrying = ref(false)
+const retrySessionLoaded = ref(false)
 
 const lastAssistantMessageId = computed(() => {
   const msgs = currentSession.value?.messages || []
@@ -326,7 +327,8 @@ function buildCallbacks(sessionId: string): SSECallbacks {
       if (!chatStore.currentTaskId) {
         chatStore.currentTaskId = event.taskId
       }
-      if (event.isRetry && chatStore.currentSessionId) {
+      if (event.isRetry && chatStore.currentSessionId && !retrySessionLoaded.value) {
+        retrySessionLoaded.value = true
         chatStore.loadSession(chatStore.currentSessionId).then(() => {
           const session = chatStore.currentSession
           if (session?.files && session.files.length > 0) {
@@ -537,6 +539,7 @@ async function handleRetryFromStage(stage: number, message?: ChatMessage) {
   const session = chatStore.currentSession
   if (!sessionId || !session || chatStore.isStreaming) return
   isRetrying.value = true
+  retrySessionLoaded.value = false
 
   const msgs = session.messages
   const lastIdx = msgs.length - 1

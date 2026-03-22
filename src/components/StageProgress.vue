@@ -252,6 +252,7 @@ function handleStageClick(stage: StageProgressState) {
   border-radius: 6px;
   cursor: pointer;
   transition: background 0.2s;
+  min-height: 48px;
 }
 
 .stage-item:hover {
@@ -350,6 +351,7 @@ function handleStageClick(stage: StageProgressState) {
   display: flex;
   flex-direction: column;
   justify-content: center;
+  min-height: 44px;
 }
 
 .stage-header {
