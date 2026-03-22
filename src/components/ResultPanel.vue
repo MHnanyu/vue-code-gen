@@ -277,6 +277,16 @@ async function ensureStageContentLoaded(key: string) {
 
   if (key.endsWith('_live')) return
 
+  const livePreview = chatStore.stagePreviewMap.get(stageName)
+  if (livePreview?.type === 'markdown' && livePreview.content) {
+    stageContentCache.value.set(key, { type: 'markdown', content: livePreview.content, files: null })
+    return
+  }
+  if (livePreview?.type === 'vue' && livePreview.files) {
+    stageContentCache.value.set(key, { type: 'vue', content: null, files: livePreview.files })
+    return
+  }
+
   let fetchPath: string | null = null
   let outputType: string | null = null
 
@@ -302,12 +312,9 @@ async function ensureStageContentLoaded(key: string) {
     }
   }
 
-  if (!fetchPath && !isDeduplicatedKey) {
-    const preview = chatStore.stagePreviewMap.get(stageName)
-    if (preview?.filePath && preview.type === 'markdown') {
-      fetchPath = preview.filePath
-      outputType = preview.type
-    }
+  if (!fetchPath && livePreview?.filePath && livePreview.type) {
+    fetchPath = livePreview.filePath
+    outputType = livePreview.type
   }
 
   if (!fetchPath || !outputType) return
@@ -349,6 +356,19 @@ watch(() => chatStore.hasStepMessages, async (has) => {
     }
     stageContentCache.value.clear()
     await ensureStageContentLoaded(activeStageKey.value)
+  }
+})
+
+watch(() => chatStore.retryInvalidatedStageNames, (names) => {
+  if (names.length > 0) {
+    for (const name of names) {
+      for (const key of stageContentCache.value.keys()) {
+        if (key === name || key.startsWith(name + '_')) {
+          stageContentCache.value.delete(key)
+        }
+      }
+    }
+    chatStore.clearRetryInvalidatedStageNames()
   }
 })
 

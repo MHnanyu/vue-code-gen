@@ -27,6 +27,7 @@ export const useChatStore = defineStore('chat', () => {
   const stageProgresses = ref<StageProgressState[]>([])
   const stagePreviewMap = ref<Map<string, { type: 'markdown' | 'vue' | null; content: string | null; files: ApiFile[] | null; filePath: string | null }>>(new Map())
   const activeStageTab = ref<string | null>(null)
+  const retryInvalidatedStageNames = ref<string[]>([])
 
   const currentSession = computed(() =>
     sessions.value.find(s => s.id === currentSessionId.value) || null
@@ -104,6 +105,14 @@ export const useChatStore = defineStore('chat', () => {
       return
     }
     activeStageTab.value = stageName
+  }
+
+  function invalidateStageCache(stageNames: string[]): void {
+    retryInvalidatedStageNames.value = stageNames
+  }
+
+  function clearRetryInvalidatedStageNames(): void {
+    retryInvalidatedStageNames.value = []
   }
 
   async function createSessionRemote(title: string, componentLib?: ComponentLib): Promise<string | null> {
@@ -292,5 +301,8 @@ export const useChatStore = defineStore('chat', () => {
     setStagePreview,
     cancelStreaming,
     setActiveStageTab,
+    retryInvalidatedStageNames,
+    invalidateStageCache,
+    clearRetryInvalidatedStageNames,
   }
 })

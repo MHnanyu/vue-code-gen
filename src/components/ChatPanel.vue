@@ -252,10 +252,9 @@ function isLastAssistantMessage(index: number): boolean {
   return lastAssistantMessageId.value?.index === index
 }
 
-function stagesToProgressStates(stages: any, stepMessages?: any[] | null): StageProgressState[] {
+function stagesToProgressStates(stages: any, stepMessages?: any[] | null, failedStep?: number | null): StageProgressState[] {
   const hasInitial = INITIAL_STAGE_KEYS.some(k => stages?.[k])
   const keys = hasInitial ? INITIAL_STAGE_KEYS : ['iteration']
-  const generationDone = stages?.generation?.status === 'success' || stages?.generation?.status === 'cached'
   const stepMsgMap = new Map<string, string>()
   if (stepMessages) {
     for (const sm of stepMessages) {
@@ -267,8 +266,8 @@ function stagesToProgressStates(stages: any, stepMessages?: any[] | null): Stage
   return keys.map((name, index) => {
     const s = stages?.[name]
     if (!s) {
-      if (hasInitial && generationDone && index > INITIAL_STAGE_KEYS.indexOf('generation')) {
-        return { stage: index, stageName: name, status: 'skipped', duration: null }
+      if (failedStep != null && index >= failedStep) {
+        return { stage: index, stageName: name, status: 'cancelled', duration: null }
       }
       return { stage: index, stageName: name, status: 'pending', duration: null }
     }
@@ -292,12 +291,12 @@ const persistedStageProgresses = computed(() => {
   const msgs = currentSession.value?.messages || []
   const lastAssistant = [...msgs].reverse().find(m => m.role === 'assistant')
   if (!lastAssistant?.stages) return []
-  return stagesToProgressStates(lastAssistant.stages, lastAssistant.stepMessages)
+  return stagesToProgressStates(lastAssistant.stages, lastAssistant.stepMessages, lastAssistant.failedStep)
 })
 
-function messageProgresses(message: { stages?: any; stepMessages?: any[] | null }): StageProgressState[] {
+function messageProgresses(message: { stages?: any; stepMessages?: any[] | null; failedStep?: number | null }): StageProgressState[] {
   if (!message.stages) return []
-  return stagesToProgressStates(message.stages, message.stepMessages)
+  return stagesToProgressStates(message.stages, message.stepMessages, message.failedStep)
 }
 
 const currentSession = computed(() => chatStore.currentSession)
@@ -350,7 +349,7 @@ function buildCallbacks(sessionId: string): SSECallbacks {
       if (!chatStore.currentTaskId) {
         chatStore.currentTaskId = event.taskId
       }
-      if (event.isRetry && chatStore.currentSessionId && !chatStore.retrySessionLoaded) {
+      if (chatStore.isRetrying && chatStore.currentSessionId && !chatStore.retrySessionLoaded) {
         chatStore.retrySessionLoaded = true
         chatStore.loadSession(chatStore.currentSessionId).then(() => {
           const session = chatStore.currentSession
@@ -362,7 +361,7 @@ function buildCallbacks(sessionId: string): SSECallbacks {
             const restoredHasInitial = INITIAL_STAGE_KEYS.some(k => lastAssistant.stages?.[k])
             const currentHasInitial = chatStore.stageProgresses.some(s => INITIAL_STAGE_KEYS.includes(s.stageName))
             if (restoredHasInitial === currentHasInitial) {
-              const progressStates = stagesToProgressStates(lastAssistant.stages, lastAssistant.stepMessages)
+              const progressStates = stagesToProgressStates(lastAssistant.stages, lastAssistant.stepMessages, lastAssistant.failedStep)
               chatStore.setStageProgresses(progressStates)
             }
           }
@@ -502,6 +501,10 @@ async function runGeneration(
     for (let i = retryFromStep; i < stageNames.length; i++) {
       chatStore.stagePreviewMap.delete(stageNames[i])
     }
+    chatStore.invalidateStageCache(stageNames.slice(retryFromStep))
+  } else if (isRetry) {
+    chatStore.stagePreviewMap.clear()
+    chatStore.invalidateStageCache(stageNames)
   } else {
     chatStore.stagePreviewMap.clear()
   }
