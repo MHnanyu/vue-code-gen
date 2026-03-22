@@ -277,16 +277,6 @@ async function ensureStageContentLoaded(key: string) {
 
   if (key.endsWith('_live')) return
 
-  const livePreview = chatStore.stagePreviewMap.get(stageName)
-  if (livePreview?.type === 'markdown' && livePreview.content) {
-    stageContentCache.value.set(key, { type: 'markdown', content: livePreview.content, files: null })
-    return
-  }
-  if (livePreview?.type === 'vue' && livePreview.files) {
-    stageContentCache.value.set(key, { type: 'vue', content: null, files: livePreview.files })
-    return
-  }
-
   let fetchPath: string | null = null
   let outputType: string | null = null
 
@@ -312,9 +302,12 @@ async function ensureStageContentLoaded(key: string) {
     }
   }
 
-  if (!fetchPath && livePreview?.filePath && livePreview.type) {
-    fetchPath = livePreview.filePath
-    outputType = livePreview.type
+  if (!fetchPath) {
+    const livePreview = chatStore.stagePreviewMap.get(stageName)
+    if (livePreview?.filePath && livePreview.type) {
+      fetchPath = livePreview.filePath
+      outputType = livePreview.type
+    }
   }
 
   if (!fetchPath || !outputType) return
@@ -342,20 +335,54 @@ watch(() => activeStageKey.value, async (key) => {
   }
 })
 
+watch(() => chatStore.stageProgresses.map(s => `${s.stageName}:${s.status}`).join(','), async () => {
+  if (!activeStageKey.value) return
+  const key = activeStageKey.value
+  if (stageContentCache.value.has(key)) return
+  const stage = completedStages.value.find(s => s._key === key)
+  if (!stage) return
+  const progress = chatStore.stageProgresses.find(s => s.stageName === stage.stageName)
+  if (progress && progress.status !== 'running' && progress.status !== 'pending') {
+    stageLoadingMap.value.set(key, false)
+    await ensureStageContentLoaded(key)
+  }
+})
+
+function purgeStaleStageCache() {
+  const validKeys = new Set(completedStages.value.map(s => s._key))
+  for (const key of stageContentCache.value.keys()) {
+    if (!validKeys.has(key)) {
+      stageContentCache.value.delete(key)
+    }
+  }
+}
+
 watch(() => chatStore.hasStepMessages, async (has) => {
-  if (has && activeStageKey.value) {
-    if (activeStageKey.value.endsWith('_live')) {
-      const stageName = activeStageKey.value.replace(/_live$/, '')
+  if (has) {
+    const resolveKey = activeStageKey.value || chatStore.activeStageTab
+    if (!resolveKey) return
+
+    if (resolveKey.endsWith('_live')) {
+      const stageName = resolveKey.replace(/_live$/, '')
       const newTab = [...completedStages.value].reverse().find((s: CompletedStage) => s.stageName === stageName && !s._key.endsWith('_live'))
       if (newTab) {
         activeStageKey.value = newTab._key
-        stageContentCache.value.clear()
+        purgeStaleStageCache()
         await ensureStageContentLoaded(newTab._key)
         return
       }
     }
-    stageContentCache.value.clear()
-    await ensureStageContentLoaded(activeStageKey.value)
+
+    let target = completedStages.value.find(s => s._key === resolveKey)
+    if (!target) {
+      target = [...completedStages.value].reverse().find(s => s.stageName === resolveKey)
+    }
+    if (target) {
+      activeTab.value = 'stages'
+      activeStageKey.value = target._key
+      purgeStaleStageCache()
+      await ensureStageContentLoaded(target._key)
+    }
   }
 })
 

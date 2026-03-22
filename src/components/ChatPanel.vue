@@ -520,6 +520,7 @@ async function runGeneration(
   } finally {
     chatStore.setLoading(false)
     chatStore.isRetrying = false
+    chatStore.retrySessionLoaded = false
     pendingUserMessage.value = ''
     scrollToBottom()
   }
