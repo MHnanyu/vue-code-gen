@@ -135,7 +135,7 @@ import { useChatStore } from '@/stores/chat'
 import { updateSessionFiles, fetchStageFile, fetchStageJson, type ApiFile } from '@/api'
 import { collectAllFiles, apiFilesToProjectFiles } from '@/utils/files'
 import { downloadBlob } from '@/utils/download'
-import { STAGE_NAME_MAP } from '@/constants/stages'
+import { STAGE_NAME_MAP, INITIAL_STAGE_KEYS } from '@/constants/stages'
 import { getBaseProjectFiles, getMainTs } from '@/templates/project-template'
 import { getCcuiComponentsAsProjectFiles } from '@/templates/ccui-components'
 import FileTree from '@/components/FileTree.vue'
@@ -170,21 +170,18 @@ const completedStages = computed<CompletedStage[]>(() => {
   const session = chatStore.currentSession
   const allOutputs = session ? session.messages.flatMap(m => m.stepMessages || []) : []
 
-  const nameCount = new Map<string, number>()
-  for (const output of allOutputs) {
-    nameCount.set(output.stageName, (nameCount.get(output.stageName) || 0) + 1)
-  }
-
   const usedKeys = new Set<string>()
   const nameIndex = new Map<string, number>()
+  const coveredStageNames = new Set<string>()
   for (const output of allOutputs) {
     nameIndex.set(output.stageName, (nameIndex.get(output.stageName) || 0) + 1)
-    const count = nameCount.get(output.stageName)!
-    const idx = nameIndex.get(output.stageName)!
     const baseName = STAGE_NAME_MAP[output.stageName] || output.stageName
-    const key = count > 1 ? `${output.stageName}_${idx}` : output.stageName
-    const label = count > 1 ? `${baseName} #${idx}` : baseName
+    const isInitial = INITIAL_STAGE_KEYS.includes(output.stageName)
+    const key = isInitial ? output.stageName : `${output.stageName}_${nameIndex.get(output.stageName)}`
+    const label = isInitial ? baseName : `${baseName} #${nameIndex.get(output.stageName)}`
+    if (usedKeys.has(key)) continue
     usedKeys.add(key)
+    coveredStageNames.add(output.stageName)
     result.push({
       _key: key,
       _label: label,
@@ -195,19 +192,21 @@ const completedStages = computed<CompletedStage[]>(() => {
     })
   }
 
-  if (chatStore.isStreaming) {
+  const showLiveTab = chatStore.isStreaming && (!chatStore.isRetrying || chatStore.retrySessionLoaded)
+
+  if (showLiveTab) {
     const fromProgress = chatStore.stageProgresses.filter(s => s.status !== 'pending')
     const existingProgressNames = new Set<string>()
     for (const s of fromProgress) {
       if (existingProgressNames.has(s.stageName)) continue
       existingProgressNames.add(s.stageName)
-      let key = s.stageName
-      let label = STAGE_NAME_MAP[s.stageName] || s.stageName
-      if (usedKeys.has(key)) continue
-      usedKeys.add(key)
+      if (INITIAL_STAGE_KEYS.includes(s.stageName) && coveredStageNames.has(s.stageName)) continue
+      const liveKey = `${s.stageName}_live`
+      if (usedKeys.has(liveKey)) continue
+      usedKeys.add(liveKey)
       result.push({
-        _key: key,
-        _label: label,
+        _key: liveKey,
+        _label: STAGE_NAME_MAP[s.stageName] || s.stageName,
         stage: s.stage,
         stageName: s.stageName,
         status: s.status,
@@ -258,7 +257,7 @@ watch(() => chatStore.activeStageTab, async (key) => {
   if (key !== null && hasStageContent.value) {
     let target = completedStages.value.find(s => s._key === key)
     if (!target) {
-      target = completedStages.value.findLast(s => s.stageName === key)
+      target = [...completedStages.value].reverse().find(s => s.stageName === key)
     }
     if (target) {
       activeTab.value = 'stages'
@@ -273,8 +272,10 @@ async function ensureStageContentLoaded(key: string) {
   if (stageLoadingMap.value.get(key)) return
 
   const stage = completedStages.value.find(s => s._key === key)
-  const stageName = stage?.stageName || key.replace(/_\d+$/, '')
+  const stageName = stage?.stageName || key.replace(/_\d+$/, '').replace(/_live$/, '')
   if (!stageName) return
+
+  if (key.endsWith('_live')) return
 
   let fetchPath: string | null = null
   let outputType: string | null = null
@@ -283,17 +284,17 @@ async function ensureStageContentLoaded(key: string) {
 
   const session = chatStore.currentSession
   if (session) {
-    const allOutputs = session.messages.flatMap(m => m.stepMessages || [])
+    const outputs = session.messages.flatMap(m => m.stepMessages || [])
     if (isDeduplicatedKey) {
       const idx = parseInt(key.split('_').pop()!) - 1
-      const sameNameOutputs = allOutputs.filter(o => o.stageName === stageName)
+      const sameNameOutputs = outputs.filter(o => o.stageName === stageName)
       const output = sameNameOutputs[idx]
       if (output) {
         fetchPath = output.filePath || null
         outputType = output.outputType || null
       }
     } else {
-      const output = allOutputs.findLast(o => o.stageName === stageName)
+      const output = [...outputs].reverse().find(o => o.stageName === stageName)
       if (output) {
         fetchPath = output.filePath || null
         outputType = output.outputType || null
@@ -336,6 +337,16 @@ watch(() => activeStageKey.value, async (key) => {
 
 watch(() => chatStore.hasStepMessages, async (has) => {
   if (has && activeStageKey.value) {
+    if (activeStageKey.value.endsWith('_live')) {
+      const stageName = activeStageKey.value.replace(/_live$/, '')
+      const newTab = [...completedStages.value].reverse().find((s: CompletedStage) => s.stageName === stageName && !s._key.endsWith('_live'))
+      if (newTab) {
+        activeStageKey.value = newTab._key
+        stageContentCache.value.clear()
+        await ensureStageContentLoaded(newTab._key)
+        return
+      }
+    }
     stageContentCache.value.clear()
     await ensureStageContentLoaded(activeStageKey.value)
   }

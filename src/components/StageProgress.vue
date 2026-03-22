@@ -89,7 +89,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { ArrowRight, Check, Close, Loading, WarningFilled, Timer, SemiSelect, Remove } from '@element-plus/icons-vue'
+import { ArrowRight, Check, Loading, WarningFilled, Timer, SemiSelect, Remove } from '@element-plus/icons-vue'
 import type { StageProgressState } from '@/types'
 import { STAGE_NAME_MAP } from '@/constants/stages'
 

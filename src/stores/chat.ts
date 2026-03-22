@@ -21,6 +21,8 @@ export const useChatStore = defineStore('chat', () => {
   const pendingAttachments = ref<Attachment[]>([])
 
   const isStreaming = ref(false)
+  const isRetrying = ref(false)
+  const retrySessionLoaded = ref(false)
   const currentTaskId = ref<string | null>(null)
   const stageProgresses = ref<StageProgressState[]>([])
   const stagePreviewMap = ref<Map<string, { type: 'markdown' | 'vue' | null; content: string | null; files: ApiFile[] | null; filePath: string | null }>>(new Map())
@@ -80,7 +82,13 @@ export const useChatStore = defineStore('chat', () => {
     files: ApiFile[] | null,
     filePath: string | null = null,
   ): void {
-    stagePreviewMap.value.set(stageName, { type, content, files, filePath })
+    const existing = stagePreviewMap.value.get(stageName)
+    stagePreviewMap.value.set(stageName, {
+      type: type ?? existing?.type ?? null,
+      content: content ?? existing?.content ?? null,
+      files: files ?? existing?.files ?? null,
+      filePath: filePath ?? existing?.filePath ?? null,
+    })
   }
 
   function cancelStreaming(): void {
@@ -256,6 +264,8 @@ export const useChatStore = defineStore('chat', () => {
     currentSession,
     sortedSessions,
     isStreaming,
+    isRetrying,
+    retrySessionLoaded,
     currentTaskId,
     stageProgresses,
     stagePreviewMap,

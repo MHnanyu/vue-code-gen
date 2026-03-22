@@ -51,7 +51,7 @@
           <template v-else-if="message.role === 'assistant'">
             <div class="mb-3">
               <StageProgress
-                  v-if="isLastAssistantMessage(idx) && chatStore.isStreaming && chatStore.stageProgresses.length > 0"
+                  v-if="isLastAssistantMessage(idx) && chatStore.isStreaming && chatStore.stageProgresses.length > 0 && chatStore.isRetrying"
                   :stages="chatStore.stageProgresses"
                   :is-streaming="true"
                   :retry-fn="handleRetryFromStage"
@@ -59,7 +59,7 @@
                   @stage-click="handleStageClick"
               />
               <StageProgress
-                v-else-if="isLastAssistantMessage(idx) && persistedStageProgresses.length > 0"
+                v-else-if="isLastAssistantMessage(idx) && persistedStageProgresses.length > 0 && chatStore.isRetrying"
                 :stages="persistedStageProgresses"
                 :is-streaming="false"
                 :retry-fn="chatStore.isStreaming ? undefined : (stage: number) => handleRetryFromStage(stage, message)"
@@ -69,7 +69,7 @@
                 v-else-if="message.stages"
                 :stages="messageProgresses(message)"
                 :is-streaming="false"
-                :retry-fn="(stage: number) => handleRetryFromStage(stage, message)"
+                :retry-fn="isLastAssistantMessage(idx) && !chatStore.isStreaming ? (stage: number) => handleRetryFromStage(stage, message) : undefined"
                 @stage-click="(stage: StageProgressState) => handleStageClick(stage, message)"
               />
             </div>
@@ -80,7 +80,7 @@
               </div>
               <div class="max-w-[80%]">
                 <div class="px-4 py-3 rounded-xl leading-relaxed break-words bg-gray-100">
-                  <template v-if="isLastAssistantMessage(idx) && isRetrying && chatStore.isStreaming">
+                  <template v-if="isLastAssistantMessage(idx) && chatStore.isRetrying && chatStore.isStreaming">
                     <el-icon class="is-loading"><Loading /></el-icon>
                     <span class="ml-1">正在重试...</span>
                   </template>
@@ -103,7 +103,7 @@
           </template>
         </template>
 
-        <template v-if="chatStore.isStreaming && !lastAssistantMessageId">
+        <template v-if="chatStore.isStreaming && !chatStore.isRetrying">
           <div class="mb-3">
             <StageProgress
               :stages="chatStore.stageProgresses"
@@ -122,6 +122,31 @@
                 <div class="px-4 py-3 rounded-xl bg-gray-100 inline-flex items-center">
                   <el-icon class="is-loading"><Loading /></el-icon>
                   <span class="ml-2 text-gray-500">正在生成...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+
+        <template v-else-if="chatStore.isStreaming && chatStore.isRetrying && !lastAssistantMessageId">
+          <div class="mb-3">
+            <StageProgress
+              :stages="chatStore.stageProgresses"
+              :is-streaming="true"
+              :retry-fn="handleRetryFromStage"
+              :cancel-fn="chatStore.cancelStreaming"
+              @stage-click="handleStageClick"
+            />
+          </div>
+          <div class="px-11 mb-5">
+            <div class="flex gap-3 mb-5">
+              <div class="flex-shrink-0">
+                <el-avatar :size="32" style="background: #67c23a">AI</el-avatar>
+              </div>
+              <div class="max-w-[80%]">
+                <div class="px-4 py-3 rounded-xl bg-gray-100 inline-flex items-center">
+                  <el-icon class="is-loading"><Loading /></el-icon>
+                  <span class="ml-2 text-gray-500">正在重试...</span>
                 </div>
               </div>
             </div>
@@ -212,8 +237,6 @@ const inputMessage = ref('')
 const messagesContainer = ref<HTMLElement | null>(null)
 const pendingUserMessage = ref('')
 const currentAttachments = ref<Attachment[]>([])
-const isRetrying = ref(false)
-const retrySessionLoaded = ref(false)
 
 const lastAssistantMessageId = computed(() => {
   const msgs = currentSession.value?.messages || []
@@ -327,8 +350,8 @@ function buildCallbacks(sessionId: string): SSECallbacks {
       if (!chatStore.currentTaskId) {
         chatStore.currentTaskId = event.taskId
       }
-      if (event.isRetry && chatStore.currentSessionId && !retrySessionLoaded.value) {
-        retrySessionLoaded.value = true
+      if (event.isRetry && chatStore.currentSessionId && !chatStore.retrySessionLoaded) {
+        chatStore.retrySessionLoaded = true
         chatStore.loadSession(chatStore.currentSessionId).then(() => {
           const session = chatStore.currentSession
           if (session?.files && session.files.length > 0) {
@@ -336,9 +359,14 @@ function buildCallbacks(sessionId: string): SSECallbacks {
           }
           const lastAssistant = [...session?.messages || []].reverse().find(m => m.role === 'assistant')
           if (lastAssistant?.stages) {
-            const progressStates = stagesToProgressStates(lastAssistant.stages, lastAssistant.stepMessages)
-            chatStore.setStageProgresses(progressStates)
+            const restoredHasInitial = INITIAL_STAGE_KEYS.some(k => lastAssistant.stages?.[k])
+            const currentHasInitial = chatStore.stageProgresses.some(s => INITIAL_STAGE_KEYS.includes(s.stageName))
+            if (restoredHasInitial === currentHasInitial) {
+              const progressStates = stagesToProgressStates(lastAssistant.stages, lastAssistant.stepMessages)
+              chatStore.setStageProgresses(progressStates)
+            }
           }
+          chatStore.isRetrying = true
           chatStore.updateStageStatus(event.stage, 'running', {
             progressMessage: '',
           })
@@ -362,17 +390,23 @@ function buildCallbacks(sessionId: string): SSECallbacks {
         progressMessage: event.message || undefined,
       })
 
-      if (event.outputType === 'markdown' && event.outputPreview) {
-        chatStore.setStagePreview(event.stageName, 'markdown', event.outputPreview, null, event.filePath)
-        chatStore.setActiveStageTab(event.stageName)
+      if (event.outputType === 'markdown') {
+        chatStore.setStagePreview(event.stageName, 'markdown', event.outputPreview || null, null, event.filePath)
+        if (event.outputPreview) {
+          chatStore.setActiveStageTab(event.stageName)
+        }
       }
 
-      if (event.outputType === 'vue' && event.files) {
-        processFilesToProject(event.files, chatStore.currentSession?.componentLib)
-        chatStore.setStagePreview(event.stageName, 'vue', null, event.files, event.vueDirPath)
-        nextTick(() => {
-          chatStore.setActiveStageTab(event.stageName)
-        })
+      if (event.outputType === 'vue') {
+        if (event.files) {
+          processFilesToProject(event.files, chatStore.currentSession?.componentLib)
+        }
+        chatStore.setStagePreview(event.stageName, 'vue', null, event.files || null, event.vueDirPath)
+        if (event.files) {
+          nextTick(() => {
+            chatStore.setActiveStageTab(event.stageName)
+          })
+        }
       }
 
       scrollToBottom()
@@ -450,12 +484,27 @@ function buildCallbacks(sessionId: string): SSECallbacks {
 async function runGeneration(
   stageNames: string[],
   execute: (callbacks: SSECallbacks) => Promise<void>,
+  isRetry = false,
+  retryFromStep = 0,
 ) {
   chatStore.currentTaskId = null
   chatStore.isStreaming = true
+  chatStore.isRetrying = isRetry
+  chatStore.retrySessionLoaded = false
   chatStore.setLoading(true)
   chatStore.resetStageProgresses(stageNames)
-  chatStore.stagePreviewMap.clear()
+  if (isRetry && retryFromStep > 0) {
+    for (let i = 0; i < retryFromStep; i++) {
+      chatStore.updateStageStatus(i, 'success')
+    }
+  }
+  if (isRetry && retryFromStep > 0) {
+    for (let i = retryFromStep; i < stageNames.length; i++) {
+      chatStore.stagePreviewMap.delete(stageNames[i])
+    }
+  } else {
+    chatStore.stagePreviewMap.clear()
+  }
 
   const callbacks = buildCallbacks(chatStore.currentSessionId!)
 
@@ -467,7 +516,7 @@ async function runGeneration(
     chatStore.currentTaskId = null
   } finally {
     chatStore.setLoading(false)
-    isRetrying.value = false
+    chatStore.isRetrying = false
     pendingUserMessage.value = ''
     scrollToBottom()
   }
@@ -538,8 +587,8 @@ async function handleRetryFromStage(stage: number, message?: ChatMessage) {
   const sessionId = chatStore.currentSessionId
   const session = chatStore.currentSession
   if (!sessionId || !session || chatStore.isStreaming) return
-  isRetrying.value = true
-  retrySessionLoaded.value = false
+  chatStore.isRetrying = true
+  chatStore.retrySessionLoaded = false
 
   const msgs = session.messages
   const lastIdx = msgs.length - 1
@@ -553,6 +602,11 @@ async function handleRetryFromStage(stage: number, message?: ChatMessage) {
     : chatStore.stageProgresses.length > 0 && !INITIAL_STAGE_KEYS.includes(chatStore.stageProgresses[0].stageName)
 
   if (isIteration) {
+    const currentLastIdx = msgs.length - 1
+    if (currentLastIdx >= 0 && msgs[currentLastIdx].role === 'assistant') {
+      msgs.splice(currentLastIdx, 1)
+    }
+
     const msgIndex = message ? session.messages.indexOf(message) : -1
     const userMessage = msgIndex >= 0
       ? session.messages.slice(0, msgIndex).reverse().find(m => m.role === 'user')
@@ -569,6 +623,8 @@ async function handleRetryFromStage(stage: number, message?: ChatMessage) {
         },
         callbacks,
       ),
+      true,
+      0,
     )
   } else {
     const firstUserMessage = session.messages.find(m => m.role === 'user')
@@ -585,11 +641,18 @@ async function handleRetryFromStage(stage: number, message?: ChatMessage) {
         },
         callbacks,
       ),
+      true,
+      stage,
     )
   }
 }
 
 function handleStageClick(stage: StageProgressState, message?: ChatMessage) {
+  if (INITIAL_STAGE_KEYS.includes(stage.stageName)) {
+    chatStore.setActiveStageTab(stage.stageName)
+    return
+  }
+
   const session = chatStore.currentSession
   if (session && message?.stepMessages) {
     const allOutputs = session.messages.flatMap(m => m.stepMessages || [])
