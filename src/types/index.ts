@@ -1,4 +1,5 @@
-import type { ApiFile, Attachment } from '@/api'
+import type { Attachment } from '@/api'
+import type { ApiFile } from '@/api'
 
 export interface StageInfo {
   status: 'success' | 'skipped' | 'error' | 'failed' | 'cancelled'
@@ -20,10 +21,8 @@ export interface StepMessage {
   message: string
   status: 'success' | 'skipped' | 'failed' | 'cached'
   duration: number | null
-  outputPreview?: string | null
   outputType?: 'markdown' | 'json' | 'vue' | null
   filePath?: string | null
-  vueDirPath?: string | null
 }
 
 export interface ChatMessage {
@@ -59,18 +58,13 @@ export interface StageCompleteEvent {
   stageName: string
   status: 'success' | 'failed' | 'skipped' | 'cached'
   duration: number | null
-  outputType: 'markdown' | 'json' | 'vue' | null
   filePath: string | null
-  vueDirPath: string | null
-  outputPreview: string | null
-  files: ApiFile[] | null
   error: string | null
   message?: string
   timestamp: string
 }
 
 export interface DoneEvent {
-  files: ApiFile[]
   message: string
   stages: Record<string, StageInfo>
   failedStep: number | null

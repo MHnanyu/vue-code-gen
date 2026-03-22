@@ -133,7 +133,7 @@ import { FullScreen } from '@element-plus/icons-vue'
 import { useProjectStore } from '@/stores/project'
 import { useChatStore } from '@/stores/chat'
 import { updateSessionFiles, fetchStageFile, fetchStageJson, type ApiFile } from '@/api'
-import { collectAllFiles, apiFilesToProjectFiles } from '@/utils/files'
+import { collectAllFiles, apiFilesToProjectFiles, filterUserFiles } from '@/utils/files'
 import { downloadBlob } from '@/utils/download'
 import { STAGE_NAME_MAP, INITIAL_STAGE_KEYS } from '@/constants/stages'
 import { getBaseProjectFiles, getMainTs } from '@/templates/project-template'
@@ -214,8 +214,8 @@ const completedStages = computed<CompletedStage[]>(() => {
       })
     }
 
-    for (const [name, preview] of chatStore.stagePreviewMap) {
-      if (!existingProgressNames.has(name) && preview.type) {
+    for (const [name, filePath] of chatStore.stagePreviewMap) {
+      if (!existingProgressNames.has(name) && filePath) {
         if (!usedKeys.has(name)) {
           usedKeys.add(name)
           result.push({
@@ -253,19 +253,7 @@ const COMPONENT_LIB_LABELS: Record<ComponentLib, string> = {
 const stageContentCache = ref<Map<string, { type: 'markdown' | 'vue' | null; content: string | null; files: ApiFile[] | null }>>(new Map())
 const stageLoadingMap = ref<Map<string, boolean>>(new Map())
 
-watch(() => chatStore.activeStageTab, async (key) => {
-  if (key !== null && hasStageContent.value) {
-    let target = completedStages.value.find(s => s._key === key)
-    if (!target) {
-      target = [...completedStages.value].reverse().find(s => s.stageName === key)
-    }
-    if (target) {
-      activeTab.value = 'stages'
-      activeStageKey.value = target._key
-      await ensureStageContentLoaded(target._key)
-    }
-  }
-}, { flush: 'sync' })
+let skipActiveStageKeyLoad = false
 
 async function ensureStageContentLoaded(key: string) {
   if (stageContentCache.value.has(key)) return
@@ -275,10 +263,7 @@ async function ensureStageContentLoaded(key: string) {
   const stageName = stage?.stageName || key.replace(/_\d+$/, '').replace(/_live$/, '')
   if (!stageName) return
 
-  if (key.endsWith('_live')) return
-
   let fetchPath: string | null = null
-  let outputType: string | null = null
 
   const isDeduplicatedKey = /_\d+$/.test(key)
 
@@ -291,36 +276,45 @@ async function ensureStageContentLoaded(key: string) {
       const output = sameNameOutputs[idx]
       if (output) {
         fetchPath = output.filePath || null
-        outputType = output.outputType || null
       }
     } else {
       const output = [...outputs].reverse().find(o => o.stageName === stageName)
       if (output) {
         fetchPath = output.filePath || null
-        outputType = output.outputType || null
       }
     }
   }
 
   if (!fetchPath) {
-    const livePreview = chatStore.stagePreviewMap.get(stageName)
-    if (livePreview?.filePath && livePreview.type) {
-      fetchPath = livePreview.filePath
-      outputType = livePreview.type
-    }
+    fetchPath = chatStore.stagePreviewMap.get(stageName) ?? null
   }
 
-  if (!fetchPath || !outputType) return
+  if (!fetchPath) return
+
+  const outputType = getStageOutputType(stageName)
+  if (!outputType) return
+
+  const wasStreaming = chatStore.isStreaming
 
   stageLoadingMap.value.set(key, true)
   try {
     if (outputType === 'markdown') {
       const content = await fetchStageFile(fetchPath)
-      stageContentCache.value.set(key, { type: 'markdown', content, files: null })
-    } else if (outputType === 'vue' || outputType === 'json') {
+      if (completedStages.value.some(s => s._key === key)) {
+        stageContentCache.value.set(key, { type: 'markdown', content, files: null })
+      }
+    } else if (outputType === 'vue') {
       const raw = await fetchStageJson<ApiFile[] | { data?: ApiFile[]; files?: ApiFile[] }>(fetchPath)
       const data = Array.isArray(raw) ? raw : (raw.data || raw.files || [])
-      stageContentCache.value.set(key, { type: 'vue', content: null, files: data })
+      if (completedStages.value.some(s => s._key === key)) {
+        stageContentCache.value.set(key, { type: 'vue', content: null, files: data })
+      }
+      if (wasStreaming) {
+        projectStore.setFiles(apiFilesToProjectFiles(data, chatStore.currentSession?.componentLib))
+        if (chatStore.currentSessionId) {
+          chatStore.updateSessionFiles(chatStore.currentSessionId, filterUserFiles(data))
+        }
+      }
     }
   } catch {
     console.warn('Failed to load stage artifact for', key)
@@ -329,10 +323,26 @@ async function ensureStageContentLoaded(key: string) {
   }
 }
 
+watch(() => chatStore.activeStageTab, async (key) => {
+  if (key !== null && hasStageContent.value) {
+    let target = completedStages.value.find(s => s._key === key)
+    if (!target) {
+      target = [...completedStages.value].reverse().find(s => s.stageName === key)
+    }
+    if (target) {
+      skipActiveStageKeyLoad = true
+      activeTab.value = 'stages'
+      activeStageKey.value = target._key
+      await ensureStageContentLoaded(target._key)
+    }
+  }
+}, { flush: 'sync' })
+
 watch(() => activeStageKey.value, async (key) => {
-  if (key) {
+  if (key && !skipActiveStageKeyLoad) {
     await ensureStageContentLoaded(key)
   }
+  skipActiveStageKeyLoad = false
 })
 
 watch(() => chatStore.stageProgresses.map(s => `${s.stageName}:${s.status}`).join(','), async () => {
@@ -359,16 +369,31 @@ function purgeStaleStageCache() {
 
 watch(() => chatStore.hasStepMessages, async (has) => {
   if (has) {
+    const persistedStages = completedStages.value.filter(s => !s._key.endsWith('_live'))
+
+    for (const [liveKey, cache] of stageContentCache.value) {
+      if (liveKey.endsWith('_live')) {
+        const stageName = liveKey.replace(/_live$/, '')
+        const target = persistedStages.find(s => s.stageName === stageName)
+        if (target && !stageContentCache.value.has(target._key)) {
+          stageContentCache.value.set(target._key, cache)
+        }
+        stageContentCache.value.delete(liveKey)
+      }
+    }
+
     const resolveKey = activeStageKey.value || chatStore.activeStageTab
     if (!resolveKey) return
 
     if (resolveKey.endsWith('_live')) {
       const stageName = resolveKey.replace(/_live$/, '')
-      const newTab = [...completedStages.value].reverse().find((s: CompletedStage) => s.stageName === stageName && !s._key.endsWith('_live'))
+      const newTab = persistedStages.find(s => s.stageName === stageName)
       if (newTab) {
         activeStageKey.value = newTab._key
         purgeStaleStageCache()
-        await ensureStageContentLoaded(newTab._key)
+        if (!stageContentCache.value.has(newTab._key)) {
+          await ensureStageContentLoaded(newTab._key)
+        }
         return
       }
     }
@@ -419,14 +444,6 @@ function getStageMarkdownContent(key: string): string | null {
     return cached.content
   }
 
-  const stageName = completedStages.value.find(s => s._key === key)?.stageName
-  if (!stageName) return null
-
-  const preview = chatStore.stagePreviewMap.get(stageName)
-  if (preview?.type === 'markdown' && preview.content) {
-    return preview.content
-  }
-
   return null
 }
 
@@ -434,14 +451,6 @@ function getStageVueFiles(key: string): ApiFile[] | null {
   const cached = stageContentCache.value.get(key)
   if (cached?.type === 'vue' && cached.files) {
     return cached.files
-  }
-
-  const stageName = completedStages.value.find(s => s._key === key)?.stageName
-  if (!stageName) return null
-
-  const preview = chatStore.stagePreviewMap.get(stageName)
-  if (preview?.type === 'vue' && preview.files) {
-    return preview.files
   }
 
   return null

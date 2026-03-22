@@ -217,7 +217,7 @@ import { ElMessage } from 'element-plus'
 import { useChatStore } from '@/stores/chat'
 import { useProjectStore } from '@/stores/project'
 import { generateInitialStream, generateIterateStream, type ApiFile, type Attachment, type SSECallbacks, API_BASE } from '@/api'
-import { apiFilesToProjectFiles, filterUserFiles } from '@/utils/files'
+import { apiFilesToProjectFiles } from '@/utils/files'
 import { STAGE_NAME_MAP, INITIAL_STAGE_KEYS } from '@/constants/stages'
 import type { ChatMessage, StageProgressState } from '@/types'
 import StageProgress from '@/components/StageProgress.vue'
@@ -389,23 +389,11 @@ function buildCallbacks(sessionId: string): SSECallbacks {
         progressMessage: event.message || undefined,
       })
 
-      if (event.outputType === 'markdown') {
-        chatStore.setStagePreview(event.stageName, 'markdown', event.outputPreview || null, null, event.filePath)
-        if (event.outputPreview) {
+      if (event.filePath) {
+        chatStore.setStagePreview(event.stageName, event.filePath)
+        nextTick(() => {
           chatStore.setActiveStageTab(event.stageName)
-        }
-      }
-
-      if (event.outputType === 'vue') {
-        if (event.files) {
-          processFilesToProject(event.files, chatStore.currentSession?.componentLib)
-        }
-        chatStore.setStagePreview(event.stageName, 'vue', null, event.files || null, event.vueDirPath)
-        if (event.files) {
-          nextTick(() => {
-            chatStore.setActiveStageTab(event.stageName)
-          })
-        }
+        })
       }
 
       scrollToBottom()
@@ -415,11 +403,6 @@ function buildCallbacks(sessionId: string): SSECallbacks {
       chatStore.isStreaming = false
       chatStore.currentTaskId = null
 
-      if (event.files) {
-        processFilesToProject(event.files, chatStore.currentSession?.componentLib)
-        chatStore.updateSessionFiles(sessionId, filterUserFiles(event.files))
-      }
-
       chatStore.addMessageLocal(sessionId, {
         role: 'assistant',
         content: event.message,
@@ -427,8 +410,6 @@ function buildCallbacks(sessionId: string): SSECallbacks {
         failedStep: event.failedStep,
         stepMessages: event.stepMessages,
       })
-
-      await chatStore.loadSession(sessionId)
 
       if (event.failedStep != null) {
         ElMessage.warning('生成失败，请点击重试按钮重试')

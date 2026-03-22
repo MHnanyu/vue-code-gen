@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import type { ChatMessage, ChatSession, ComponentLib, StageProgressState } from '@/types'
-import type { Attachment, ApiFile } from '@/api'
+import type { Attachment } from '@/api'
 import {
   createSession as apiCreateSession,
   getSessions as apiGetSessions,
@@ -25,7 +25,7 @@ export const useChatStore = defineStore('chat', () => {
   const retrySessionLoaded = ref(false)
   const currentTaskId = ref<string | null>(null)
   const stageProgresses = ref<StageProgressState[]>([])
-  const stagePreviewMap = ref<Map<string, { type: 'markdown' | 'vue' | null; content: string | null; files: ApiFile[] | null; filePath: string | null }>>(new Map())
+  const stagePreviewMap = ref<Map<string, string | null>>(new Map())
   const activeStageTab = ref<string | null>(null)
   const retryInvalidatedStageNames = ref<string[]>([])
 
@@ -78,18 +78,9 @@ export const useChatStore = defineStore('chat', () => {
 
   function setStagePreview(
     stageName: string,
-    type: 'markdown' | 'vue' | null,
-    content: string | null,
-    files: ApiFile[] | null,
-    filePath: string | null = null,
+    filePath: string | null,
   ): void {
-    const existing = stagePreviewMap.value.get(stageName)
-    stagePreviewMap.value.set(stageName, {
-      type: type ?? existing?.type ?? null,
-      content: content ?? existing?.content ?? null,
-      files: files ?? existing?.files ?? null,
-      filePath: filePath ?? existing?.filePath ?? null,
-    })
+    stagePreviewMap.value.set(stageName, filePath)
   }
 
   function cancelStreaming(): void {
