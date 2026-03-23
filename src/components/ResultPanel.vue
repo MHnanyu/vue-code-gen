@@ -103,8 +103,18 @@
             :name="stage._key"
           >
             <div class="stage-content">
+              <template v-if="stage._key.endsWith('_live')">
+                <el-skeleton :loading="true" animated>
+                  <template #template>
+                    <div class="stage-live-placeholder">
+                      <el-icon class="is-loading" :size="28"><Loading /></el-icon>
+                      <span>生成中...</span>
+                    </div>
+                  </template>
+                </el-skeleton>
+              </template>
               <MarkdownPreview
-                v-if="getStageOutputType(stage.stageName) === 'markdown'"
+                v-else-if="getStageOutputType(stage.stageName) === 'markdown'"
                 :content="getStageMarkdownContent(stage._key)"
                 :loading="stage.status === 'running'"
               />
@@ -129,7 +139,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { FullScreen } from '@element-plus/icons-vue'
+import { FullScreen, Loading } from '@element-plus/icons-vue'
 import { useProjectStore } from '@/stores/project'
 import { useChatStore } from '@/stores/chat'
 import { updateSessionFiles, fetchStageFile, fetchStageJson, type ApiFile } from '@/api'
@@ -303,11 +313,14 @@ async function ensureStageContentLoaded(key: string) {
       const stillValid = completedStages.value.some(s => s._key === key)
       if (stillValid) {
         stageContentCache.value.set(key, { type: 'markdown', content, files: null })
-      }
-      if (!stillValid && key.endsWith('_live')) {
-        const baseKey = key.replace(/_live$/, '')
-        if (!stageContentCache.value.has(baseKey)) {
-          stageContentCache.value.set(baseKey, { type: 'markdown', content, files: null })
+      } else if (key.endsWith('_live')) {
+        const persisted = [...completedStages.value]
+          .filter(s => s.stageName === stageName && !s._key.endsWith('_live'))
+        if (persisted.length > 0) {
+          const targetKey = persisted[persisted.length - 1]._key
+          if (!stageContentCache.value.has(targetKey)) {
+            stageContentCache.value.set(targetKey, { type: 'markdown', content, files: null })
+          }
         }
       }
     } else if (outputType === 'vue') {
@@ -316,14 +329,17 @@ async function ensureStageContentLoaded(key: string) {
       const stillValid = completedStages.value.some(s => s._key === key)
       if (stillValid) {
         stageContentCache.value.set(key, { type: 'vue', content: null, files: data })
-      }
-      if (!stillValid && key.endsWith('_live')) {
-        const baseKey = key.replace(/_live$/, '')
-        if (!stageContentCache.value.has(baseKey)) {
-          stageContentCache.value.set(baseKey, { type: 'vue', content: null, files: data })
+      } else if (key.endsWith('_live')) {
+        const persisted = [...completedStages.value]
+          .filter(s => s.stageName === stageName && !s._key.endsWith('_live'))
+        if (persisted.length > 0) {
+          const targetKey = persisted[persisted.length - 1]._key
+          if (!stageContentCache.value.has(targetKey)) {
+            stageContentCache.value.set(targetKey, { type: 'vue', content: null, files: data })
+          }
         }
       }
-      if (wasStreaming) {
+      if (wasStreaming || !stillValid) {
         projectStore.setFiles(apiFilesToProjectFiles(data, chatStore.currentSession?.componentLib))
         if (chatStore.currentSessionId) {
           chatStore.updateSessionFiles(chatStore.currentSessionId, filterUserFiles(data))
@@ -333,7 +349,7 @@ async function ensureStageContentLoaded(key: string) {
   } catch {
     console.warn('Failed to load stage artifact for', key)
   } finally {
-    stageLoadingMap.value.set(key, false)
+    stageLoadingMap.value.delete(key)
   }
 }
 
@@ -381,14 +397,19 @@ function purgeStaleStageCache() {
   }
 }
 
-watch(() => chatStore.hasStepMessages, async (has) => {
-  if (has) {
+watch(
+  [() => chatStore.hasStepMessages, () => chatStore.isStreaming],
+  async ([has, streaming], [prevHas, prevStreaming]) => {
+    const shouldRun = (has && !prevHas) || (has && !streaming && prevStreaming === true)
+    if (!shouldRun) return
+
+    const knownKeys = new Set(stageContentCache.value.keys())
     const persistedStages = completedStages.value.filter(s => !s._key.endsWith('_live'))
 
     for (const [liveKey, cache] of stageContentCache.value) {
       if (liveKey.endsWith('_live')) {
         const stageName = liveKey.replace(/_live$/, '')
-        const target = persistedStages.find(s => s.stageName === stageName)
+        const target = [...persistedStages].reverse().find(s => s.stageName === stageName)
         if (target && !stageContentCache.value.has(target._key)) {
           stageContentCache.value.set(target._key, cache)
         }
@@ -396,47 +417,37 @@ watch(() => chatStore.hasStepMessages, async (has) => {
       }
     }
 
-    for (const [liveKey, loading] of stageLoadingMap.value) {
-      if (liveKey.endsWith('_live') && loading) {
-        const stageName = liveKey.replace(/_live$/, '')
-        const target = persistedStages.find(s => s.stageName === stageName)
-        if (target && !stageContentCache.value.has(target._key)) {
-          stageLoadingMap.value.set(target._key, true)
-          stageLoadingMap.value.delete(liveKey)
-        }
-      }
-    }
-
     const resolveKey = activeStageKey.value || chatStore.activeStageTab
-    if (!resolveKey) return
 
-    if (resolveKey.endsWith('_live')) {
+    if (resolveKey?.endsWith('_live')) {
       const stageName = resolveKey.replace(/_live$/, '')
-      const newTab = persistedStages.find(s => s.stageName === stageName)
+      const newTab = [...persistedStages].reverse().find(s => s.stageName === stageName)
       if (newTab) {
         activeStageKey.value = newTab._key
         purgeStaleStageCache()
-        if (!stageContentCache.value.has(newTab._key) && !stageLoadingMap.value.get(newTab._key)) {
-          await ensureStageContentLoaded(newTab._key)
-        }
-        return
       }
     }
 
-    let target = completedStages.value.find(s => s._key === resolveKey)
-    if (!target) {
-      target = [...completedStages.value].reverse().find(s => s.stageName === resolveKey)
-    }
-    if (target) {
-      activeTab.value = 'stages'
-      activeStageKey.value = target._key
-      purgeStaleStageCache()
-      if (!stageContentCache.value.has(target._key) && !stageLoadingMap.value.get(target._key)) {
-        await ensureStageContentLoaded(target._key)
+    if (resolveKey && !resolveKey.endsWith('_live')) {
+      let target = completedStages.value.find(s => s._key === resolveKey)
+      if (!target) {
+        target = [...completedStages.value].reverse().find(s => s.stageName === resolveKey)
+      }
+      if (target) {
+        activeTab.value = 'stages'
+        activeStageKey.value = target._key
+        purgeStaleStageCache()
       }
     }
-  }
-})
+
+    const newStages = persistedStages.filter(s => !knownKeys.has(s._key))
+    for (const stage of newStages) {
+      if (!stageContentCache.value.has(stage._key)) {
+        await ensureStageContentLoaded(stage._key)
+      }
+    }
+  },
+)
 
 watch(() => chatStore.retryInvalidatedStageNames, (names) => {
   if (names.length > 0) {
@@ -741,5 +752,15 @@ async function exportProject() {
 
 .editor-panel :deep(.monaco-editor-container) {
   flex: 1;
+}
+.stage-live-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  gap: 12px;
+  color: #909399;
+  font-size: 14px;
 }
 </style>

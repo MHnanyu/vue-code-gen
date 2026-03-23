@@ -219,7 +219,7 @@ import { useProjectStore } from '@/stores/project'
 import { generateInitialStream, generateIterateStream, type ApiFile, type Attachment, type SSECallbacks, API_BASE } from '@/api'
 import { apiFilesToProjectFiles } from '@/utils/files'
 import { STAGE_NAME_MAP, INITIAL_STAGE_KEYS } from '@/constants/stages'
-import type { ChatMessage, StageProgressState } from '@/types'
+import type { ChatMessage, StageProgressState, StepMessage } from '@/types'
 import StageProgress from '@/components/StageProgress.vue'
 
 const props = defineProps<{
@@ -392,6 +392,9 @@ function buildCallbacks(sessionId: string): SSECallbacks {
       if (event.filePath) {
         chatStore.setStagePreview(event.stageName, event.filePath)
         nextTick(() => {
+          if (chatStore.activeStageTab === event.stageName) {
+            chatStore.activeStageTab = null
+          }
           chatStore.setActiveStageTab(event.stageName)
         })
       }
@@ -400,16 +403,41 @@ function buildCallbacks(sessionId: string): SSECallbacks {
     },
 
     async onDone(event) {
-      chatStore.isStreaming = false
       chatStore.currentTaskId = null
+
+      if (chatStore.isRetrying) {
+        const msgs = chatStore.currentSession?.messages
+        if (msgs) {
+          const lastIdx = msgs.length - 1
+          if (lastIdx >= 0 && msgs[lastIdx].role === 'assistant') {
+            msgs.splice(lastIdx, 1)
+          }
+        }
+      }
+
+      const fallbackStepMessages: StepMessage[] | undefined =
+        event.stepMessages && event.stepMessages.length > 0
+          ? undefined
+          : chatStore.stageProgresses
+              .filter(s => s.status !== 'pending')
+              .map(s => ({
+                stage: s.stage,
+                stageName: s.stageName,
+                message: s.progressMessage || '',
+                status: s.status as StepMessage['status'],
+                duration: s.duration,
+                filePath: chatStore.stagePreviewMap.get(s.stageName) || null,
+              }))
 
       chatStore.addMessageLocal(sessionId, {
         role: 'assistant',
         content: event.message,
         stages: event.stages as any,
         failedStep: event.failedStep,
-        stepMessages: event.stepMessages,
+        stepMessages: event.stepMessages || fallbackStepMessages,
       })
+
+      chatStore.isStreaming = false
 
       if (event.failedStep != null) {
         ElMessage.warning('生成失败，请点击重试按钮重试')
@@ -422,18 +450,38 @@ function buildCallbacks(sessionId: string): SSECallbacks {
     },
 
     onError(event) {
-      chatStore.isStreaming = false
       chatStore.currentTaskId = null
       chatStore.setLoading(false)
       pendingUserMessage.value = ''
+
+      if (chatStore.isRetrying) {
+        const msgs = chatStore.currentSession?.messages
+        if (msgs) {
+          const lastIdx = msgs.length - 1
+          if (lastIdx >= 0 && msgs[lastIdx].role === 'assistant') {
+            msgs.splice(lastIdx, 1)
+          }
+        }
+      }
 
       chatStore.addMessageLocal(sessionId, {
         role: 'assistant',
         content: event.message,
         stages: event.stages as any,
         failedStep: event.failedStep,
+        stepMessages: chatStore.stageProgresses
+          .filter(s => s.status !== 'pending')
+          .map(s => ({
+            stage: s.stage,
+            stageName: s.stageName,
+            message: s.progressMessage || '',
+            status: s.status as StepMessage['status'],
+            duration: s.duration,
+            filePath: chatStore.stagePreviewMap.get(s.stageName) || null,
+          })),
       })
 
+      chatStore.isStreaming = false
       chatStore.loadSession(sessionId)
 
       ElMessage.error(`生成失败：${event.message}`)
@@ -441,10 +489,19 @@ function buildCallbacks(sessionId: string): SSECallbacks {
     },
 
     onCancelled(event) {
-      chatStore.isStreaming = false
       chatStore.currentTaskId = null
       chatStore.setLoading(false)
       pendingUserMessage.value = ''
+
+      if (chatStore.isRetrying) {
+        const msgs = chatStore.currentSession?.messages
+        if (msgs) {
+          const lastIdx = msgs.length - 1
+          if (lastIdx >= 0 && msgs[lastIdx].role === 'assistant') {
+            msgs.splice(lastIdx, 1)
+          }
+        }
+      }
 
       chatStore.addMessageLocal(sessionId, {
         role: 'assistant',
@@ -453,6 +510,7 @@ function buildCallbacks(sessionId: string): SSECallbacks {
         failedStep: event.cancelledAtStep,
       })
 
+      chatStore.isStreaming = false
       chatStore.loadSession(sessionId)
 
       ElMessage.info('已取消生成')
