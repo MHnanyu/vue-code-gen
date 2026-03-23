@@ -102,8 +102,8 @@
             :label="stage._label"
             :name="stage._key"
           >
-            <div class="stage-content" v-memo="[stage._key, getStageVueFiles(stage._key), getStageMarkdownContent(stage._key)]">
-              <template v-if="stage._key.endsWith('_live')">
+            <div class="stage-content" v-memo="[stage._key, getStageVueFiles(stage._key), getStageMarkdownContent(stage._key), stage.status]">
+              <template v-if="stage._key.endsWith('_live') && stage.status === 'running'">
                 <el-skeleton :loading="true" animated>
                   <template #template>
                     <div class="stage-live-placeholder">
@@ -112,6 +112,12 @@
                     </div>
                   </template>
                 </el-skeleton>
+              </template>
+              <template v-else-if="stage._key.endsWith('_live') && stage.status !== 'running' && stage.status !== 'pending' && !getStageMarkdownContent(stage._key) && !getStageVueFiles(stage._key)">
+                <div class="stage-live-placeholder">
+                  <el-icon class="is-loading" :size="28"><Loading /></el-icon>
+                  <span>加载中...</span>
+                </div>
               </template>
               <MarkdownPreview
                 v-else-if="getStageOutputType(stage.stageName) === 'markdown'"
@@ -394,8 +400,7 @@ watch(() => chatStore.stageProgresses.map(s => `${s.stageName}:${s.status}`).joi
 
   if (chatStore.isStreaming) {
     for (const progress of chatStore.stageProgresses) {
-      if (['generation', 'optimization', 'iteration'].includes(progress.stageName)
-          && progress.status !== 'running' && progress.status !== 'pending'
+      if (progress.status !== 'running' && progress.status !== 'pending'
           && chatStore.stagePreviewMap.has(progress.stageName)) {
         const liveKey = progress.stageName + '_live'
         if (!stageContentCache.value.has(liveKey) && !stageLoadingMap.value.get(liveKey)) {

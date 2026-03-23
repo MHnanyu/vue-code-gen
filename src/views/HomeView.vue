@@ -58,44 +58,34 @@
 
         <div class="flex justify-between items-center mt-4 pt-4 border-t border-gray-200">
           <div class="flex gap-3 items-center">
-            <el-tag type="success" effect="plain" size="large">Vue3</el-tag>
-            <el-select v-model="selectedLib" style="width: 140px">
+            <el-upload
+              v-model:file-list="imageList"
+              :auto-upload="false"
+              accept="image/*"
+              :limit="5"
+              :show-file-list="false"
+              :on-change="handleImageChange"
+            >
+              <el-button>上传图片</el-button>
+            </el-upload>
+            <el-upload
+              v-model:file-list="attachList"
+              :auto-upload="false"
+              accept=".md,.txt"
+              :limit="5"
+              :show-file-list="false"
+              :on-change="handleAttachChange"
+            >
+              <el-button>上传附件</el-button>
+            </el-upload>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <el-select v-model="selectedLib" placeholder="组件库" style="width: 140px">
               <el-option label="ElementUI" value="ElementUI" />
               <el-option label="AUI" value="aui" />
               <el-option label="CcUI" value="ccui" />
             </el-select>
-          </div>
-
-          <div class="flex items-center gap-3">
-            <el-tooltip content="上传图片" placement="top">
-              <el-upload
-                v-model:file-list="imageList"
-                :auto-upload="false"
-                accept="image/*"
-                :limit="5"
-                :show-file-list="false"
-                :on-change="handleImageChange"
-              >
-                <el-button circle>
-                  <el-icon size="18"><Picture /></el-icon>
-                </el-button>
-              </el-upload>
-            </el-tooltip>
-            <el-tooltip content="上传附件" placement="top">
-              <el-upload
-                v-model:file-list="attachList"
-                :auto-upload="false"
-                accept=".md,.txt"
-                :limit="5"
-                :show-file-list="false"
-                :on-change="handleAttachChange"
-              >
-                <el-button circle>
-                  <el-icon size="18"><Paperclip /></el-icon>
-                </el-button>
-              </el-upload>
-            </el-tooltip>
-
             <el-button type="success" :loading="loading" :disabled="!canGenerate" @click="handleGenerate">
               生成 ➤
             </el-button>
@@ -113,13 +103,13 @@ import { useChatStore } from '@/stores/chat'
 import { uploadFiles as apiUploadFiles, type Attachment } from '@/api'
 import type { ComponentLib } from '@/types'
 import type { UploadFile, UploadUserFile } from 'element-plus'
-import { Paperclip, Picture, Document, Close } from '@element-plus/icons-vue'
+import { Document, Close } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const chatStore = useChatStore()
 
 const prompt = ref('')
-const selectedLib = ref('ElementUI')
+const selectedLib = ref('')
 const loading = ref(false)
 const imageList = ref<UploadUserFile[]>([])
 const attachList = ref<UploadUserFile[]>([])
@@ -186,7 +176,7 @@ async function handleGenerate() {
 
     const sessionId = await chatStore.createSessionRemote(
       prompt.value.slice(0, 30) || `基于${attachments.length}个文件生成`,
-      selectedLib.value as ComponentLib
+      (selectedLib.value || 'ElementUI') as ComponentLib
     )
     if (sessionId) {
       router.push({ path: '/workspace', query: { session_id: sessionId } })
