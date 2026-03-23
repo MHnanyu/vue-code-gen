@@ -102,7 +102,7 @@
             :label="stage._label"
             :name="stage._key"
           >
-            <div class="stage-content">
+            <div class="stage-content" v-memo="[stage._key, getStageVueFiles(stage._key), getStageMarkdownContent(stage._key)]">
               <template v-if="stage._key.endsWith('_live')">
                 <el-skeleton :loading="true" animated>
                   <template #template>
@@ -357,7 +357,10 @@ watch(() => chatStore.activeStageTab, async (key) => {
   if (key !== null && hasStageContent.value) {
     let target = completedStages.value.find(s => s._key === key)
     if (!target) {
-      target = [...completedStages.value].reverse().find(s => s.stageName === key)
+      target = completedStages.value.find(s => s.stageName === key && s._key.endsWith('_live'))
+    }
+    if (!target) {
+      target = [...completedStages.value].reverse().find(s => s.stageName === key && !s._key.endsWith('_live'))
     }
     if (target) {
       skipActiveStageKeyLoad = true
@@ -376,15 +379,30 @@ watch(() => activeStageKey.value, async (key) => {
 })
 
 watch(() => chatStore.stageProgresses.map(s => `${s.stageName}:${s.status}`).join(','), async () => {
-  if (!activeStageKey.value) return
-  const key = activeStageKey.value
-  if (stageContentCache.value.has(key)) return
-  if (stageLoadingMap.value.get(key)) return
-  const stage = completedStages.value.find(s => s._key === key)
-  if (!stage) return
-  const progress = chatStore.stageProgresses.find(s => s.stageName === stage.stageName)
-  if (progress && progress.status !== 'running' && progress.status !== 'pending') {
-    await ensureStageContentLoaded(key)
+  if (activeStageKey.value) {
+    const key = activeStageKey.value
+    if (!stageContentCache.value.has(key) && !stageLoadingMap.value.get(key)) {
+      const stage = completedStages.value.find(s => s._key === key)
+      if (stage) {
+        const progress = chatStore.stageProgresses.find(s => s.stageName === stage.stageName)
+        if (progress && progress.status !== 'running' && progress.status !== 'pending') {
+          await ensureStageContentLoaded(key)
+        }
+      }
+    }
+  }
+
+  if (chatStore.isStreaming) {
+    for (const progress of chatStore.stageProgresses) {
+      if (['generation', 'optimization', 'iteration'].includes(progress.stageName)
+          && progress.status !== 'running' && progress.status !== 'pending'
+          && chatStore.stagePreviewMap.has(progress.stageName)) {
+        const liveKey = progress.stageName + '_live'
+        if (!stageContentCache.value.has(liveKey) && !stageLoadingMap.value.get(liveKey)) {
+          await ensureStageContentLoaded(liveKey)
+        }
+      }
+    }
   }
 })
 
@@ -428,13 +446,12 @@ watch(
       }
     }
 
-    if (resolveKey && !resolveKey.endsWith('_live')) {
+    if (resolveKey && !resolveKey.endsWith('_live') && activeTab.value === 'stages') {
       let target = completedStages.value.find(s => s._key === resolveKey)
       if (!target) {
         target = [...completedStages.value].reverse().find(s => s.stageName === resolveKey)
       }
       if (target) {
-        activeTab.value = 'stages'
         activeStageKey.value = target._key
         purgeStaleStageCache()
       }

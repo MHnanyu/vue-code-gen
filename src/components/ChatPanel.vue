@@ -113,16 +113,14 @@
               @stage-click="handleStageClick"
             />
           </div>
-          <div class="px-11 mb-5">
-            <div class="flex gap-3 mb-5">
-              <div class="flex-shrink-0">
-                <el-avatar :size="32" style="background: #67c23a">AI</el-avatar>
-              </div>
-              <div class="max-w-[80%]">
-                <div class="px-4 py-3 rounded-xl bg-gray-100 inline-flex items-center">
-                  <el-icon class="is-loading"><Loading /></el-icon>
-                  <span class="ml-2 text-gray-500">正在生成...</span>
-                </div>
+          <div class="flex gap-3 mb-5">
+            <div class="flex-shrink-0">
+              <el-avatar :size="32" style="background: #67c23a">AI</el-avatar>
+            </div>
+            <div class="max-w-[80%]">
+              <div class="px-4 py-3 rounded-xl bg-gray-100 inline-flex items-center">
+                <el-icon class="is-loading"><Loading /></el-icon>
+                <span class="ml-2 text-gray-500">正在生成...</span>
               </div>
             </div>
           </div>
@@ -138,16 +136,14 @@
               @stage-click="handleStageClick"
             />
           </div>
-          <div class="px-11 mb-5">
-            <div class="flex gap-3 mb-5">
-              <div class="flex-shrink-0">
-                <el-avatar :size="32" style="background: #67c23a">AI</el-avatar>
-              </div>
-              <div class="max-w-[80%]">
-                <div class="px-4 py-3 rounded-xl bg-gray-100 inline-flex items-center">
-                  <el-icon class="is-loading"><Loading /></el-icon>
-                  <span class="ml-2 text-gray-500">正在重试...</span>
-                </div>
+          <div class="flex gap-3 mb-5">
+            <div class="flex-shrink-0">
+              <el-avatar :size="32" style="background: #67c23a">AI</el-avatar>
+            </div>
+            <div class="max-w-[80%]">
+              <div class="px-4 py-3 rounded-xl bg-gray-100 inline-flex items-center">
+                <el-icon class="is-loading"><Loading /></el-icon>
+                <span class="ml-2 text-gray-500">正在重试...</span>
               </div>
             </div>
           </div>
@@ -391,12 +387,6 @@ function buildCallbacks(sessionId: string): SSECallbacks {
 
       if (event.filePath) {
         chatStore.setStagePreview(event.stageName, event.filePath)
-        nextTick(() => {
-          if (chatStore.activeStageTab === event.stageName) {
-            chatStore.activeStageTab = null
-          }
-          chatStore.setActiveStageTab(event.stageName)
-        })
       }
 
       scrollToBottom()
