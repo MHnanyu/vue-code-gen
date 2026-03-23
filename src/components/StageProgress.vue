@@ -70,9 +70,7 @@
               <el-icon><Timer /></el-icon>
               {{ stage.duration.toFixed(1) }}s
             </span>
-            <span v-if="stage.progressMessage" class="stage-progress-text" :class="{ 'text-success': stage.status === 'success' || stage.status === 'cached' }">
-              {{ stage.progressMessage }}
-            </span>
+            <div v-if="stage.progressMessage" class="stage-progress-text" :class="{ 'text-success': stage.status === 'success' || stage.status === 'cached' }" v-html="renderMarkdown(stage.progressMessage)" />
           </div>
           <div v-if="stage.status === 'failed'" class="stage-error">
             {{ stage.progressMessage || '步骤执行失败' }}
@@ -90,8 +88,14 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { ArrowRight, Check, Loading, WarningFilled, Timer, SemiSelect, Remove } from '@element-plus/icons-vue'
+import { marked } from 'marked'
 import type { StageProgressState } from '@/types'
 import { STAGE_NAME_MAP } from '@/constants/stages'
+
+function renderMarkdown(text: string): string {
+  const result = marked.parse(text)
+  return typeof result === 'string' ? result : ''
+}
 
 const props = defineProps<{
   stages: StageProgressState[]
@@ -393,10 +397,72 @@ function handleStageClick(stage: StageProgressState) {
 .stage-progress-text {
   font-size: 12px;
   color: #409eff;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.stage-progress-text :deep(.markdown-body),
+.stage-progress-text :deep(h1),
+.stage-progress-text :deep(h2),
+.stage-progress-text :deep(h3) {
+  font-size: 12px;
+  margin: 4px 0 2px;
+  font-weight: 600;
+}
+
+.stage-progress-text :deep(p) {
+  margin: 2px 0;
+}
+
+.stage-progress-text :deep(table) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 4px 0;
+}
+
+.stage-progress-text :deep(th),
+.stage-progress-text :deep(td) {
+  border: 1px solid #ebeef5;
+  padding: 2px 6px;
+  text-align: left;
+  font-size: 11px;
+}
+
+.stage-progress-text :deep(th) {
+  background: #f5f7fa;
+  font-weight: 600;
+}
+
+.stage-progress-text :deep(ul),
+.stage-progress-text :deep(ol) {
+  padding-left: 16px;
+  margin: 2px 0;
+}
+
+.stage-progress-text :deep(li) {
+  margin: 1px 0;
+}
+
+.stage-progress-text :deep(code) {
+  background: #f5f7fa;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
 }
 
 .stage-progress-text.text-success {
   color: #67c23a;
+}
+
+.stage-progress-text.text-success :deep(h1),
+.stage-progress-text.text-success :deep(h2),
+.stage-progress-text.text-success :deep(h3),
+.stage-progress-text.text-success :deep(p),
+.stage-progress-text.text-success :deep(li),
+.stage-progress-text.text-success :deep(td),
+.stage-progress-text.text-success :deep(th),
+.stage-progress-text.text-success :deep(span) {
+  color: #909399;
 }
 
 .stage-error {
