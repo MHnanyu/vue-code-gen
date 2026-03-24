@@ -246,12 +246,12 @@ function updateGlowSize() {
         gradEl.setAttribute('y2', String(p2.y))
 
         if (stopEls.length >= 6) {
-          const phase = Math.sin(time * 0.0008) * 30
-          const base = 290 + phase
-          stopEls[1].setAttribute('stop-color', `hsl(${base}, 80%, 65%)`)
-          stopEls[2].setAttribute('stop-color', `hsl(${base + 10}, 75%, 75%)`)
-          stopEls[3].setAttribute('stop-color', `hsl(${base + 20}, 70%, 82%)`)
-          stopEls[4].setAttribute('stop-color', `hsl(${base + 30}, 75%, 70%)`)
+          const phase = Math.sin(time * 0.0008) * 40
+          const base = 280 + phase
+          stopEls[1].setAttribute('stop-color', `hsl(${base}, 72%, 58%)`)
+          stopEls[2].setAttribute('stop-color', `hsl(${base + 10}, 72%, 63%)`)
+          stopEls[3].setAttribute('stop-color', `hsl(${base + 20}, 72%, 68%)`)
+          stopEls[4].setAttribute('stop-color', `hsl(${base + 30}, 72%, 63%)`)
         }
       }
 
