@@ -4,10 +4,10 @@
       <h1 class="text-5xl font-semibold text-gray-800 mb-3 flex items-center justify-center gap-3 leading-normal">
         <span class="text-4xl">✨</span>
         <span class="bg-gradient-to-r from-indigo-500 to-purple-600 bg-clip-text text-transparent leading-normal">
-          Page Generator
+          Design AI
         </span>
       </h1>
-      <p class="text-xl text-gray-600 mb-10">输入需求，智能生成页面原型</p>
+      <p class="text-xl text-gray-600 mb-10">今天，我可以帮你设计什么？</p>
 
       <el-card class="rounded-2xl mb-6" shadow="always">
         <el-input
