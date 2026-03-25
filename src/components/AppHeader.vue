@@ -1,5 +1,5 @@
 <template>
-  <header class="flex justify-between items-center px-6 py-3 bg-white border-b border-gray-200 shadow-sm">
+  <header class="relative z-10 flex justify-between items-center px-6 py-3 bg-transparent border-b border-transparent">
     <div class="flex items-center gap-2 cursor-pointer" @click="$router.push('/')">
       <span class="font-semibold text-lg text-gray-700">Design AI</span>
     </div>
