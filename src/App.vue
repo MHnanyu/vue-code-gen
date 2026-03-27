@@ -2,19 +2,22 @@
   <div class="app-root" :class="{ 'has-bg': isHome }">
     <div v-if="isHome" class="aurora-bg"></div>
     <AppHeader />
-    <main class="h-[calc(100vh-60px)] relative z-10 overflow-hidden">
+    <main class="h-screen relative z-10 overflow-hidden">
       <router-view />
     </main>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import AppHeader from './components/AppHeader.vue'
 
 const route = useRoute()
-const isHome = computed(() => route.path === '/')
+const isHome = ref(window.location.pathname === '/')
+watch(() => route.path, (path) => {
+  isHome.value = path === '/'
+})
 </script>
 
 <style scoped>
