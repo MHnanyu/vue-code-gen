@@ -1,6 +1,6 @@
 <template>
-  <div class="app-root">
-    <div class="aurora-bg"></div>
+  <div class="app-root" :class="{ 'has-bg': isHome }">
+    <div v-if="isHome" class="aurora-bg"></div>
     <AppHeader />
     <main class="h-[calc(100vh-60px)] relative z-10 overflow-hidden">
       <router-view />
@@ -9,15 +9,24 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
 import AppHeader from './components/AppHeader.vue'
+
+const route = useRoute()
+const isHome = computed(() => route.path === '/')
 </script>
 
 <style scoped>
 .app-root {
   min-height: 100vh;
-  background: linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%);
   position: relative;
   overflow: hidden;
+  background: #f9fafb;
+}
+
+.app-root.has-bg {
+  background: linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%);
 }
 
 .aurora-bg {

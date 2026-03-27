@@ -8,7 +8,6 @@
 @layer base {
   body {
     @apply font-sans antialiased;
-    background: linear-gradient(135deg, #eff6ff 0%, #e0e7ff 100%);
     overflow: hidden;
   }
 
