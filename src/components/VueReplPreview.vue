@@ -44,14 +44,13 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, onUnmounted } from 'vue'
-import { ElMessage } from 'element-plus'
 import { Loading } from '@element-plus/icons-vue'
 import { Repl, useStore, useVueImportMap } from '@vue/repl'
 import CodeMirror from '@vue/repl/codemirror-editor'
-import { collectAllFiles } from '@/utils/files'
-import { downloadBlob } from '@/utils/download'
+import { REPL_IMPORTS, buildPreviewHeadHTML } from '@/utils/repl-config'
+import { buildReplFiles } from '@/utils/repl-files'
+import { useExportHtml } from '@/composables/useExportHtml'
 import type { ProjectFile } from '@/types'
-
 
 const props = withDefaults(defineProps<{
   files: ProjectFile[]
@@ -77,169 +76,26 @@ const replStore = useStore({
   builtinImportMap: computed(() => ({
     imports: {
       ...vueImportMap.value.imports,
-      'element-plus': 'https://unpkg.com/element-plus@2.4.4/dist/index.full.mjs',
-      '@element-plus/icons-vue': 'https://unpkg.com/@element-plus/icons-vue@2.3.1/dist/index.js',
-      'echarts': 'https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.esm.min.js',
+      ...REPL_IMPORTS,
     },
   })),
 })
 
 const previewOptions = {
-  headHTML: `
-    <link rel="stylesheet" href="https://unpkg.com/element-plus@2.4.4/dist/index.css">
-    <script src="https://cdn.tailwindcss.com"><\/script>
-    <style>
-      blockquote {
-        border-left: 4px solid #e5e7eb;
-        padding-left: 1rem;
-        margin: 1rem 0;
-        color: #6b7280;
-      }
-    </style>
-  `
+  headHTML: buildPreviewHeadHTML(),
 }
 
-const SUPPORTED_EXTS = /\.(vue|ts|tsx|js|jsx)$/
-
-function normalizeImports(content: string, filename: string): string {
-  let result = content
-
-  if (filename === 'App.vue') {
-    const scriptMatch = result.match(/(<script\s+setup[^>]*>)([\s\S]*?)(<\/script>)/)
-    if (scriptMatch && !scriptMatch[2].includes('element-plus')) {
-      const needsVueImports = []
-      if (!scriptMatch[2].includes('getCurrentInstance')) needsVueImports.push('getCurrentInstance')
-      
-      const vueImport = needsVueImports.length > 0 
-        ? `import { ${needsVueImports.join(', ')} } from 'vue'\n` 
-        : ''
-      
-      const newScript = scriptMatch[1] + 
-        `\n${vueImport}import ElementPlus from 'element-plus'\n` +
-        `const instance = getCurrentInstance()\n` +
-        `const app = instance?.appContext.app\n` +
-        `if (app && !app._elementPlusRegistered) {\n` +
-        `  app.use(ElementPlus)\n` +
-        `  app._elementPlusRegistered = true\n` +
-        `}\n` +
-        scriptMatch[2] + 
-        scriptMatch[3]
-      result = result.replace(scriptMatch[0], newScript)
-    }
-  }
-
-  result = result
-    .replace(/^import\s+\*\s+as\s+echarts\s+from\s+['"]echarts['"]\s*;?\s*$/gm,
-      `import * as _ec from 'echarts'; const echarts = {..._ec, init(...a){ const c=_ec.init(...a); requestAnimationFrame(()=>c.resize()); return c }}`)
-    .replace(/^import\s+echarts\s+from\s+['"]echarts['"]\s*;?\s*$/gm,
-      `import * as _ec from 'echarts'; const echarts = {..._ec, init(...a){ const c=_ec.init(...a); requestAnimationFrame(()=>c.resize()); return c }}`)
-    .replace(/^import\s+['"][^'"]+\.css['"]\s*;?\s*$/gm, '')
-    .replace(/(['"])@\/(?:[^'"]*\/)?([^/'"]+)\1/g, '$1./$2$1')
-    .replace(/(['"])\.\.?\/(?:[^'"]*\/)?([^/'"]+\.(vue|ts|tsx|js|jsx))\1/g, '$1./$2$1')
-
-  return result
-}
-
-function generateAppVue(newFiles: Record<string, string>): string | null {
-  const firstVueFile = Object.keys(newFiles).find(name => 
-    name.endsWith('.vue') && 
-    name !== 'App.vue' && 
-    !name.startsWith('ccui/')
-  )
-  if (!firstVueFile) return null
-  
-  const componentName = firstVueFile.replace('.vue', '')
-  
-  const ccuiFiles = Object.keys(newFiles).filter(name => name.startsWith('ccui/') && name.endsWith('.vue'))
-  const hasCcui = ccuiFiles.length > 0
-  
-  let ccuiImports = ''
-  let ccuiRegisters = ''
-  
-  if (hasCcui) {
-    const componentNames = ccuiFiles.map(f => {
-      const baseName = f.replace('ccui/', '').replace('.vue', '')
-      return { importName: `Cc${baseName}`, fileName: f, tagName: `Cc${baseName}` }
-    })
-    
-    ccuiImports = componentNames.map(c => `import ${c.importName} from './${c.fileName}'`).join('\n') + '\n'
-    ccuiRegisters = '\n' + componentNames.map(c => `app.component('${c.tagName}', ${c.importName})`).join('\n')
-  }
-  
-  return `<template>
-  <${componentName} />
-</template>
-
-<script setup>
-import { getCurrentInstance } from 'vue'
-import ${componentName} from './${firstVueFile}'
-import ElementPlus from 'element-plus'
-${ccuiImports}
-const instance = getCurrentInstance()
-const app = instance?.appContext.app
-if (app) {
-  if (!app._elementPlusRegistered) {
-    app.use(ElementPlus)
-    app._elementPlusRegistered = true
-  }${ccuiRegisters}
-}
-<\/script>
-`
-}
+const { exportStaticHtml } = useExportHtml()
 
 function syncFilesToRepl() {
-  const allFiles = collectAllFiles(props.files)
-  if (allFiles.length === 0) {
+  const newFiles = buildReplFiles(props.files)
+  if (!newFiles) {
     isReplReady.value = false
     return
   }
-
-  const newFiles: Record<string, string> = {}
-  for (const f of allFiles) {
-    if (!f.content || !SUPPORTED_EXTS.test(f.name)) continue
-    const fileKey = f.path.startsWith('/src/') ? f.path.slice(5) : f.path.slice(1)
-    newFiles[fileKey] = normalizeImports(f.content, f.name)
-  }
-
-  delete newFiles['App.vue']
-  const appVueContent = generateAppVue(newFiles)
-  if (!appVueContent) {
-    isReplReady.value = false
-    return
-  }
-  newFiles['App.vue'] = appVueContent
 
   replStore.setFiles(newFiles, 'App.vue')
   isReplReady.value = true
-}
-
-function exportStaticHtml() {
-  const replWrapper = document.querySelector('.repl-wrapper')
-  if (!replWrapper) {
-    ElMessage.warning('预览区域未找到')
-    return
-  }
-  
-  const iframe = replWrapper.querySelector('iframe') as HTMLIFrameElement
-  if (!iframe) {
-    ElMessage.warning('预览 iframe 未找到')
-    return
-  }
-
-  try {
-    const innerDoc = iframe.contentDocument || iframe.contentWindow?.document
-    if (!innerDoc) {
-      ElMessage.warning('无法访问预览内容')
-      return
-    }
-
-    const htmlContent = innerDoc.documentElement.outerHTML
-    downloadBlob(htmlContent, 'exported-page.html')
-    ElMessage.success('导出成功')
-  } catch (error) {
-    console.error('Export failed:', error)
-    ElMessage.error('导出失败，可能是跨域限制')
-  }
 }
 
 let isMounted = true
