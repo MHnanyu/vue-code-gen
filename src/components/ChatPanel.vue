@@ -21,71 +21,21 @@
     <div class="flex-1 overflow-y-auto p-4" ref="messagesContainer">
       <template v-if="sessionMessages.length || chatStore.isStreaming">
         <template v-for="(message, idx) in sessionMessages" :key="message.id">
-          <div v-if="message.role === 'user'" class="flex gap-3 mb-3 flex-row-reverse">
-            <div class="flex-shrink-0">
-              <el-avatar :size="32" style="background: #409eff">U</el-avatar>
-            </div>
-            <div class="max-w-[80%] flex flex-col items-end">
-              <div class="px-4 py-3 rounded-xl leading-relaxed break-words bg-blue-500 text-white">
-                <div v-if="message.attachments?.length" class="flex flex-wrap gap-2 mb-2 items-center">
-                  <template v-for="att in message.attachments" :key="att.id">
-                    <el-popover v-if="att.type === 'image'" placement="top" :width="300" trigger="hover">
-                      <template #reference>
-                        <img :src="`${API_BASE}${att.url}`" class="w-16 h-16 rounded-lg object-cover cursor-pointer border-2 border-white/30 shrink-0" />
-                      </template>
-                      <img :src="`${API_BASE}${att.url}`" class="w-full rounded" />
-                    </el-popover>
-                    <el-tooltip v-else :content="att.name" placement="top" :show-after="300">
-                      <div class="flex items-center gap-1 w-16 h-16 rounded-lg bg-blue-400 text-white text-xs shrink-0 flex-col justify-center cursor-default">
-                        <el-icon :size="20"><Document /></el-icon>
-                        <span class="w-full text-center truncate px-1">{{ att.name }}</span>
-                      </div>
-                    </el-tooltip>
-                  </template>
-                </div>
-                {{ message.content }}
-              </div>
-            </div>
-          </div>
+          <UserMessageBubble v-if="message.role === 'user'" :message="message" />
 
-          <template v-else-if="message.role === 'assistant'">
-            <div class="mb-3">
-              <StageProgress
-                v-if="shouldShowMessageProgress(message, idx)"
-                :stages="getMessageProgress(message, idx)"
-                :is-streaming="isLastAssistantMessage(idx) && chatStore.isRetrying && chatStore.isStreaming"
-                :retry-fn="getRetryFn(idx, message)"
-                @stage-click="(stage: StageProgressState) => handleStageClick(stage, message)"
-              />
-            </div>
-
-            <div class="flex gap-3 mb-5">
-              <div class="flex-shrink-0">
-                <el-avatar :size="32" style="background: #67c23a">AI</el-avatar>
-              </div>
-              <div class="max-w-[80%]">
-                <div class="px-4 py-3 rounded-xl leading-relaxed break-words bg-gray-100">
-                  <template v-if="isLastAssistantMessage(idx) && chatStore.isRetrying && chatStore.isStreaming">
-                    <el-icon class="is-loading"><Loading /></el-icon>
-                    <span class="ml-1">正在重试...</span>
-                  </template>
-                  <template v-else>
-                    {{ message.content }}
-                  </template>
-                </div>
-              </div>
-            </div>
-
-            <div v-if="showErrorMessage(message, idx)" class="mb-3 px-11">
-              <div class="text-xs text-red-500">
-                <template v-for="(stage, key) in message.stages" :key="key">
-                  <span v-if="stage?.status === 'error' || stage?.status === 'failed'" class="mr-2">
-                    {{ STAGE_NAME_MAP[key as keyof typeof STAGE_NAME_MAP] || key }}: {{ stage?.error }}
-                  </span>
-                </template>
-              </div>
-            </div>
-          </template>
+          <AssistantMessageBubble
+            v-else-if="message.role === 'assistant'"
+            :message="message"
+            :index="idx"
+            :show-progress="shouldShowMessageProgress(message, idx)"
+            :progress-stages="getMessageProgress(message, idx)"
+            :is-last="isLastAssistantMessage(idx)"
+            :is-retrying="chatStore.isRetrying"
+            :is-streaming="chatStore.isStreaming"
+            :show-error="showErrorMessage(message, idx)"
+            :retry-fn="getRetryFn(idx, message)"
+            @stage-click="(stage: StageProgressState) => handleStageClick(stage, message)"
+          />
         </template>
 
         <StreamingBubble
@@ -136,37 +86,27 @@
       </el-empty>
     </div>
 
-    <div class="px-4 py-4 border-t border-gray-200">
-      <el-input
-        v-model="inputMessage"
-        type="textarea"
-        :rows="3"
-        :placeholder="placeholder"
-        resize="none"
-        @keydown.enter.ctrl="sendMessage"
-      />
-      <div class="flex justify-between items-center mt-3">
-        <span class="text-xs text-gray-400">Ctrl + Enter 发送</span>
-        <el-button type="primary" :loading="isLoading" :disabled="!inputMessage.trim() || chatStore.isStreaming" @click="sendMessage">
-          发送
-        </el-button>
-      </div>
-    </div>
+    <ChatInput
+      v-model="inputMessage"
+      :placeholder="placeholder"
+      :loading="isLoading"
+      :streaming="chatStore.isStreaming"
+      @send="sendMessage"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
-import { DArrowRight, Loading, Document } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { computed, watch, nextTick, onUnmounted } from 'vue'
+import { DArrowRight, Loading } from '@element-plus/icons-vue'
 import { useChatStore } from '@/stores/chat'
-import { useProjectStore } from '@/stores/project'
-import { generateInitialStream, generateIterateStream, type ApiFile, type Attachment, type SSECallbacks, API_BASE } from '@/api'
-import { apiFilesToProjectFiles } from '@/utils/files'
-import { STAGE_NAME_MAP, INITIAL_STAGE_KEYS } from '@/constants/stages'
-import type { ChatMessage, StageProgressState, StepMessage } from '@/types'
-import StageProgress from '@/components/StageProgress.vue'
+import type { StageProgressState, ChatMessage } from '@/types'
 import StreamingBubble from '@/components/StreamingBubble.vue'
+import UserMessageBubble from '@/components/UserMessageBubble.vue'
+import AssistantMessageBubble from '@/components/AssistantMessageBubble.vue'
+import ChatInput from '@/components/ChatInput.vue'
+import { useStageProgress } from '@/composables/useStageProgress'
+import { useGeneration } from '@/composables/useGeneration'
 
 defineProps<{
   historyCollapsed?: boolean
@@ -177,17 +117,18 @@ defineEmits<{
 }>()
 
 const chatStore = useChatStore()
-const projectStore = useProjectStore()
 
-const inputMessage = ref('')
-const messagesContainer = ref<HTMLElement | null>(null)
-const pendingUserMessage = ref('')
-const currentAttachments = ref<Attachment[]>([])
-const postStreamReloadNeeded = ref(false)
+const {
+  isLastAssistantMessage,
+  shouldShowMessageProgress,
+  getMessageProgress,
+  showErrorMessage,
+  showStreamingBubble,
+  streamingBubbleLabel,
+} = useStageProgress()
 
 const currentSession = computed(() => chatStore.currentSession)
 const sessionMessages = computed(() => currentSession.value?.messages ?? [])
-const isLoading = computed(() => chatStore.isLoading)
 
 const placeholder = computed(() =>
   currentSession.value
@@ -195,142 +136,36 @@ const placeholder = computed(() =>
     : '输入您的需求，开始生成代码...'
 )
 
-const lastAssistantMessage = computed(() => {
-  const msgs = currentSession.value?.messages || []
-  for (let i = msgs.length - 1; i >= 0; i--) {
-    if (msgs[i].role === 'assistant') return msgs[i]
-  }
-  return null
-})
-
-const lastAssistantIndex = computed(() => {
-  if (!lastAssistantMessage.value) return -1
-  return currentSession.value!.messages.indexOf(lastAssistantMessage.value)
-})
-
-function isLastAssistantMessage(index: number): boolean {
-  return lastAssistantIndex.value === index
-}
-
-function stagesToProgressStates(stages: any, stepMessages?: any[] | null, failedStep?: number | null): StageProgressState[] {
-  const hasInitial = INITIAL_STAGE_KEYS.some(k => stages?.[k])
-  const keys = hasInitial ? INITIAL_STAGE_KEYS : ['iteration']
-  const stepMsgMap = new Map<string, string>()
-  if (stepMessages) {
-    for (const sm of stepMessages) {
-      if (sm.stageName && sm.message) {
-        stepMsgMap.set(sm.stageName, sm.message)
-      }
-    }
-  }
-  return keys.map((name, index) => {
-    const s = stages?.[name]
-    if (!s) {
-      if (failedStep != null && index >= failedStep) {
-        return { stage: index, stageName: name, status: 'cancelled', duration: null }
-      }
-      return { stage: index, stageName: name, status: 'pending', duration: null }
-    }
-    const status: StageProgressState['status'] =
-      s.status === 'success' ? 'success' :
-      s.status === 'cached' ? 'cached' :
-      s.status === 'skipped' ? 'skipped' :
-      s.status === 'error' || s.status === 'failed' ? 'failed' :
-      s.status === 'cancelled' ? 'cancelled' : 'pending'
-    return {
-      stage: index,
-      stageName: name,
-      status,
-      duration: s.duration ?? null,
-      progressMessage: s.error || stepMsgMap.get(name) || undefined,
-    }
-  })
-}
-
-function messageProgresses(message: { stages?: any; stepMessages?: any[] | null; failedStep?: number | null }): StageProgressState[] {
-  if (!message.stages) return []
-  return stagesToProgressStates(message.stages, message.stepMessages, message.failedStep)
-}
-
-const persistedStageProgresses = computed(() => {
-  if (!lastAssistantMessage.value?.stages) return []
-  return stagesToProgressStates(lastAssistantMessage.value.stages, lastAssistantMessage.value.stepMessages, lastAssistantMessage.value.failedStep)
-})
-
-function shouldShowMessageProgress(message: ChatMessage, idx: number): boolean {
-  if (!isLastAssistantMessage(idx)) {
-    return messageProgresses(message).length > 0
-  }
-  if (chatStore.isRetrying && chatStore.isStreaming) {
-    return chatStore.stageProgresses.length > 0
-  }
-  if (chatStore.isRetrying) {
-    return persistedStageProgresses.value.length > 0
-  }
-  return !!message.stages
-}
-
-function getMessageProgress(message: ChatMessage, idx: number): StageProgressState[] {
-  if (isLastAssistantMessage(idx)) {
-    if (chatStore.isRetrying && chatStore.isStreaming) {
-      return chatStore.stageProgresses
-    }
-    if (chatStore.isRetrying) {
-      return persistedStageProgresses.value
-    }
-  }
-  return messageProgresses(message)
-}
-
 function getRetryFn(idx: number, message: ChatMessage): ((stage: number) => void) | undefined {
   if (!isLastAssistantMessage(idx) || chatStore.isStreaming) return undefined
   return (stage: number) => handleRetryFromStage(stage, message)
 }
 
-function showErrorMessage(message: ChatMessage, idx: number): boolean {
-  return isLastAssistantMessage(idx)
-    && !chatStore.isStreaming
-    && chatStore.stageProgresses.length === 0
-    && message.failedStep != null
+function scrollToBottom() {
+  nextTick(() => {
+    if (messagesContainer.value) {
+      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+    }
+  })
 }
 
-const showStreamingBubble = computed(() => {
-  if (!chatStore.isStreaming) return false
-  if (!chatStore.isRetrying) return true
-  return lastAssistantIndex.value === -1
-})
-
-const streamingBubbleLabel = computed(() =>
-  chatStore.isRetrying ? '正在重试...' : '正在生成...'
-)
+const {
+  inputMessage,
+  pendingUserMessage,
+  currentAttachments,
+  isLoading,
+  messagesContainer,
+  sendMessage,
+  handleRetryFromStage,
+  handleStageClick,
+} = useGeneration(scrollToBottom)
 
 const showPendingLoading = computed(() =>
   isLoading.value
   && !chatStore.isStreaming
-  && currentSession.value?.messages.length === 0
+  && chatStore.currentSession?.messages.length === 0
   && pendingUserMessage.value
 )
-
-function buildFallbackStepMessages(
-  progresses: StageProgressState[],
-  previewMap: Map<string, string | null>,
-): StepMessage[] {
-  return progresses
-    .filter(s => s.status !== 'pending')
-    .map(s => ({
-      stage: s.stage,
-      stageName: s.stageName,
-      message: s.progressMessage || '',
-      status: s.status as StepMessage['status'],
-      duration: s.duration,
-      filePath: previewMap.get(s.stageName) || null,
-    }))
-}
-
-function processFilesToProject(files: ApiFile[], componentLib?: string): void {
-  const projectFiles = apiFilesToProjectFiles(files, componentLib as any)
-  projectStore.setFiles(projectFiles)
-}
 
 watch(currentSession, () => {
   scrollToBottom()
@@ -353,340 +188,6 @@ watch(() => chatStore.pendingPrompt, (prompt) => {
 onUnmounted(() => {
   chatStore.cancelStreaming()
 })
-
-function scrollToBottom() {
-  nextTick(() => {
-    if (messagesContainer.value) {
-      messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
-    }
-  })
-}
-
-function buildCallbacks(sessionId: string): SSECallbacks {
-  return {
-    onStageStart(event) {
-      if (!chatStore.currentTaskId) {
-        chatStore.currentTaskId = event.taskId
-      }
-      if (chatStore.isRetrying && chatStore.currentSessionId && !chatStore.retrySessionLoaded) {
-        chatStore.retrySessionLoaded = true
-        chatStore.loadSession(chatStore.currentSessionId).then(() => {
-          chatStore.isRetrying = true
-          const session = chatStore.currentSession
-          if (session?.files && session.files.length > 0) {
-            processFilesToProject(session.files, session.componentLib)
-          }
-          const lastAssistant = [...session?.messages || []].reverse().find(m => m.role === 'assistant')
-          if (lastAssistant?.stages) {
-            const restoredHasInitial = INITIAL_STAGE_KEYS.some(k => lastAssistant.stages?.[k])
-            const currentHasInitial = chatStore.stageProgresses.some(s => INITIAL_STAGE_KEYS.includes(s.stageName))
-            if (restoredHasInitial === currentHasInitial) {
-              const progressStates = stagesToProgressStates(lastAssistant.stages, lastAssistant.stepMessages, lastAssistant.failedStep)
-              chatStore.setStageProgresses(progressStates)
-            }
-          }
-          chatStore.updateStageStatus(event.stage, 'running', {
-            progressMessage: '',
-          })
-        })
-      } else {
-        chatStore.updateStageStatus(event.stage, 'running', {
-          progressMessage: '',
-        })
-      }
-    },
-
-    onStageProgress(event) {
-      chatStore.updateStageStatus(event.stage, 'running', {
-        progressMessage: event.message,
-      })
-    },
-
-    onStageComplete(event) {
-      chatStore.updateStageStatus(event.stage, event.status, {
-        duration: event.duration,
-        progressMessage: event.message || undefined,
-      })
-
-      if (event.filePath) {
-        chatStore.setStagePreview(event.stageName, event.filePath)
-      }
-
-      scrollToBottom()
-    },
-
-    onDone(event) {
-      chatStore.currentTaskId = null
-
-      if (chatStore.isRetrying) {
-        chatStore.removeLastAssistantMessage(sessionId)
-      }
-
-      const fallbackStepMessages: StepMessage[] | undefined =
-        event.stepMessages && event.stepMessages.length > 0
-          ? undefined
-          : buildFallbackStepMessages(chatStore.stageProgresses, chatStore.stagePreviewMap)
-
-      chatStore.addMessageLocal(sessionId, {
-        role: 'assistant',
-        content: event.message,
-        stages: event.stages as any,
-        failedStep: event.failedStep,
-        stepMessages: event.stepMessages || fallbackStepMessages,
-      })
-
-      chatStore.isStreaming = false
-
-      if (event.failedStep != null) {
-        ElMessage.warning('生成失败，请点击重试按钮重试')
-      } else {
-        ElMessage.success('生成成功')
-      }
-
-      pendingUserMessage.value = ''
-      scrollToBottom()
-    },
-
-    onError(event) {
-      chatStore.currentTaskId = null
-      chatStore.setLoading(false)
-      pendingUserMessage.value = ''
-
-      if (chatStore.isRetrying) {
-        chatStore.removeLastAssistantMessage(sessionId)
-      }
-
-      chatStore.addMessageLocal(sessionId, {
-        role: 'assistant',
-        content: event.message,
-        stages: event.stages as any,
-        failedStep: event.failedStep,
-        stepMessages: buildFallbackStepMessages(chatStore.stageProgresses, chatStore.stagePreviewMap),
-      })
-
-      chatStore.isStreaming = false
-      postStreamReloadNeeded.value = true
-
-      ElMessage.error(`生成失败：${event.message}`)
-      scrollToBottom()
-    },
-
-    onCancelled(event) {
-      chatStore.currentTaskId = null
-      chatStore.setLoading(false)
-      pendingUserMessage.value = ''
-
-      if (chatStore.isRetrying) {
-        chatStore.removeLastAssistantMessage(sessionId)
-      }
-
-      chatStore.addMessageLocal(sessionId, {
-        role: 'assistant',
-        content: '已取消生成',
-        stages: event.stages as any,
-        failedStep: event.cancelledAtStep,
-      })
-
-      chatStore.isStreaming = false
-      postStreamReloadNeeded.value = true
-
-      ElMessage.info('已取消生成')
-      scrollToBottom()
-    },
-  }
-}
-
-async function runGeneration(
-  stageNames: string[],
-  execute: (callbacks: SSECallbacks) => Promise<void>,
-  isRetry = false,
-  retryFromStep = 0,
-) {
-  chatStore.currentTaskId = null
-  chatStore.isStreaming = true
-  chatStore.isRetrying = isRetry
-  chatStore.retrySessionLoaded = false
-  chatStore.setLoading(true)
-  chatStore.resetStageProgresses(stageNames)
-
-  if (isRetry && retryFromStep > 0) {
-    for (let i = 0; i < retryFromStep; i++) {
-      chatStore.updateStageStatus(i, 'success')
-    }
-    for (let i = retryFromStep; i < stageNames.length; i++) {
-      chatStore.stagePreviewMap.delete(stageNames[i])
-    }
-    chatStore.invalidateStageCache(stageNames.slice(retryFromStep))
-  } else if (isRetry) {
-    chatStore.stagePreviewMap.clear()
-    chatStore.invalidateStageCache(stageNames)
-  } else {
-    chatStore.stagePreviewMap.clear()
-  }
-
-  const callbacks = buildCallbacks(chatStore.currentSessionId!)
-
-  postStreamReloadNeeded.value = false
-
-  try {
-    await execute(callbacks)
-  } catch (error) {
-    ElMessage.error('生成失败: ' + (error as Error).message)
-    chatStore.isStreaming = false
-    chatStore.currentTaskId = null
-    chatStore.setLoading(false)
-    postStreamReloadNeeded.value = true
-  } finally {
-    if (postStreamReloadNeeded.value && chatStore.currentSessionId) {
-      await chatStore.loadSession(chatStore.currentSessionId)
-    }
-    chatStore.setLoading(false)
-    chatStore.isRetrying = false
-    chatStore.retrySessionLoaded = false
-    pendingUserMessage.value = ''
-    scrollToBottom()
-  }
-}
-
-async function sendMessage() {
-  const message = inputMessage.value.trim()
-  if (!message || isLoading.value || chatStore.isStreaming) return
-
-  inputMessage.value = ''
-  let sessionId = chatStore.currentSessionId
-  if (!sessionId) {
-    sessionId = await chatStore.createSessionRemote(message)
-    if (!sessionId) return
-  }
-
-  const attachmentsToSend = currentAttachments.value.length > 0 ? [...currentAttachments.value] : undefined
-  currentAttachments.value = []
-
-  pendingUserMessage.value = message
-  scrollToBottom()
-
-  try {
-    await chatStore.addMessageRemote(sessionId, {
-      role: 'user',
-      content: message,
-      attachments: attachmentsToSend,
-    })
-
-    const hasExistingFiles = currentSession.value?.files && currentSession.value.files.length > 0
-    const isNewSession = !hasExistingFiles
-
-    const stageNames = isNewSession
-      ? [...INITIAL_STAGE_KEYS]
-      : ['iteration']
-
-    if (isNewSession) {
-      await runGeneration(stageNames, (callbacks) =>
-        generateInitialStream(
-          {
-            prompt: message,
-            sessionId,
-            debug: false,
-            componentLib: currentSession.value?.componentLib,
-            attachments: attachmentsToSend,
-          },
-          callbacks,
-        ),
-      )
-    } else {
-      await runGeneration(stageNames, (callbacks) =>
-        generateIterateStream(
-          {
-            prompt: message,
-            sessionId,
-            files: currentSession.value!.files!,
-          },
-          callbacks,
-        ),
-      )
-    }
-  } catch {
-    // errors handled by runGeneration
-  }
-}
-
-async function handleRetryFromStage(stage: number, message?: ChatMessage) {
-  const sessionId = chatStore.currentSessionId
-  const session = chatStore.currentSession
-  if (!sessionId || !session || chatStore.isStreaming) return
-  chatStore.isRetrying = true
-  chatStore.retrySessionLoaded = false
-
-  chatStore.removeLastAssistantMessage(sessionId, true)
-
-  const msgStages = message?.stages
-  const isIteration = msgStages
-    ? !INITIAL_STAGE_KEYS.some(k => (msgStages as any)?.[k])
-    : chatStore.stageProgresses.length > 0 && !INITIAL_STAGE_KEYS.includes(chatStore.stageProgresses[0].stageName)
-
-  if (isIteration) {
-    chatStore.removeLastAssistantMessage(sessionId)
-
-    const msgIndex = message ? session.messages.indexOf(message) : -1
-    const userMessage = msgIndex >= 0
-      ? session.messages.slice(0, msgIndex).reverse().find(m => m.role === 'user')
-      : session.messages.filter(m => m.role === 'user').at(-1)
-    if (!userMessage) return
-
-    await runGeneration(['iteration'], (callbacks) =>
-      generateIterateStream(
-        {
-          prompt: userMessage.content,
-          sessionId,
-          files: session.files!,
-          fromStep: 0,
-        },
-        callbacks,
-      ),
-      true,
-      0,
-    )
-  } else {
-    const firstUserMessage = session.messages.find(m => m.role === 'user')
-    if (!firstUserMessage) return
-
-    await runGeneration([...INITIAL_STAGE_KEYS], (callbacks) =>
-      generateInitialStream(
-        {
-          prompt: firstUserMessage.content,
-          sessionId,
-          componentLib: session.componentLib,
-          attachments: firstUserMessage.attachments,
-          fromStep: stage,
-        },
-        callbacks,
-      ),
-      true,
-      stage,
-    )
-  }
-}
-
-function handleStageClick(stage: StageProgressState, message?: ChatMessage) {
-  if (INITIAL_STAGE_KEYS.includes(stage.stageName)) {
-    chatStore.setActiveStageTab(stage.stageName)
-    return
-  }
-
-  const session = chatStore.currentSession
-  if (session && message?.stepMessages) {
-    const allOutputs = session.messages.flatMap(m => m.stepMessages || [])
-    const sameNameOutputs = allOutputs.filter(o => o.stageName === stage.stageName)
-    if (sameNameOutputs.length > 1) {
-      const msgOutput = message.stepMessages.find(o => o.stageName === stage.stageName)
-      if (msgOutput) {
-        const idx = sameNameOutputs.indexOf(msgOutput) + 1
-        chatStore.setActiveStageTab(`${stage.stageName}_${idx}`)
-        return
-      }
-    }
-  }
-  chatStore.setActiveStageTab(stage.stageName)
-}
 </script>
 
 <style scoped>
