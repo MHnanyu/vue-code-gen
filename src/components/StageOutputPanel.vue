@@ -1,17 +1,17 @@
 <template>
-  <div class="stage-output-panel flex-1">
-    <el-tabs v-model="activeStageKey" type="border-card" class="stage-tabs">
+  <div class="flex-1 overflow-hidden flex flex-col">
+    <el-tabs v-model="activeStageKey" type="border-card" class="stage-tabs h-full flex flex-col">
       <el-tab-pane
         v-for="stage in completedStages"
         :key="stage._key"
         :label="stage._label"
         :name="stage._key"
       >
-        <div class="stage-content" v-memo="[stage._key, getStageVueFiles(stage._key), getStageMarkdownContent(stage._key), stage.status]">
+        <div class="h-full overflow-hidden" v-memo="[stage._key, getStageVueFiles(stage._key), getStageMarkdownContent(stage._key), stage.status]">
           <template v-if="stage._key.endsWith('_live') && stage.status === 'running'">
             <el-skeleton :loading="true" animated>
               <template #template>
-                <div class="stage-live-placeholder">
+                <div class="flex flex-col items-center justify-center h-[200px] gap-3 text-gray-400 text-sm">
                   <el-icon class="is-loading" :size="28"><Loading /></el-icon>
                   <span>生成中...</span>
                 </div>
@@ -25,7 +25,7 @@
           />
           <VueReplPreview
             v-else-if="getStageOutputType(stage.stageName) === 'vue' && getStageVueFiles(stage._key)"
-            class="stage-repl"
+            class="h-full"
             :files="apiFilesToProjectFiles(getStageVueFiles(stage._key)!, chatStore.currentSession?.componentLib)"
             :show-toolbar="false"
             empty-text="暂无 Vue 产物"
@@ -393,18 +393,6 @@ function getStageVueFiles(key: string): ApiFile[] | null {
 </script>
 
 <style scoped>
-.stage-output-panel {
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-.stage-tabs {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
 .stage-tabs :deep(.el-tabs__content) {
   flex: 1;
   overflow: hidden;
@@ -412,25 +400,5 @@ function getStageVueFiles(key: string): ApiFile[] | null {
 
 .stage-tabs :deep(.el-tab-pane) {
   height: 100%;
-}
-
-.stage-content {
-  height: 100%;
-  overflow: hidden;
-}
-
-.stage-repl {
-  height: 100%;
-}
-
-.stage-live-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 200px;
-  gap: 12px;
-  color: #909399;
-  font-size: 14px;
 }
 </style>

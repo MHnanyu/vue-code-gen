@@ -1,5 +1,5 @@
 <template>
-  <div class="stage-progress" :class="{ 'has-failure': hasFailure, 'has-cancelled': hasCancelled }">
+  <div class="py-1.5">
     <StageProgressToggle
       :collapsed="collapsed"
       :is-streaming="isStreaming"
@@ -13,7 +13,7 @@
       :cancel-fn="cancelFn"
       @toggle="collapsed = !collapsed"
     />
-    <div v-show="!collapsed" class="stage-list">
+    <div v-show="!collapsed" class="flex flex-col">
       <StageProgressItem
         v-for="(stage, index) in stages"
         :key="stage.stage"
@@ -97,13 +97,3 @@ function handleStageClick(stage: StageProgressState) {
 }
 </script>
 
-<style scoped>
-.stage-progress {
-  padding: 6px 0;
-}
-
-.stage-list {
-  display: flex;
-  flex-direction: column;
-}
-</style>

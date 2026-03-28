@@ -29,7 +29,7 @@
               <input
                 :ref="el => setInputRef(el as HTMLInputElement)"
                 v-model="editTitle"
-                class="edit-input"
+                class="w-full max-w-[160px] h-6 px-1.5 border border-blue-500 rounded outline-none text-sm leading-[22px] bg-white"
                 @click.stop
                 @blur="handleBlur"
                 @keydown.enter="handleEnter"
@@ -64,7 +64,7 @@
         </el-button>
       </div>
 
-      <el-empty v-if="sortedSessions.length === 0" description="暂无历史记录" :image-size="60" />
+      <el-empty v-if="sortedSessions.length === 0" description="暂无历史记录" :image-size="60" class="empty-box" />
     </div>
   </div>
 </template>
@@ -225,21 +225,7 @@ function formatTime(date: Date): string {
 </script>
 
 <style scoped>
-:deep(.el-empty) {
+.empty-box :deep(.el-empty) {
   padding: 40px 0;
-}
-
-.edit-input {
-  width: 100%;
-  max-width: 160px;
-  height: 24px;
-  padding: 0 6px;
-  border: 1px solid #409eff;
-  border-radius: 4px;
-  outline: none;
-  font-size: 14px;
-  font-family: inherit;
-  line-height: 22px;
-  background: #fff;
 }
 </style>

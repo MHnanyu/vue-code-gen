@@ -1,7 +1,7 @@
 <template>
   <div class="text-sm">
-    <div class="file-section">
-      <div class="section-header">
+    <div class="mb-2">
+      <div class="flex justify-between items-center px-3 py-2 pb-1 border-b border-gray-200/60">
         <span class="font-medium text-gray-700">用户文件</span>
         <el-button size="small" type="primary" link @click="$emit('add-file')">
           <el-icon><Plus /></el-icon> 新增
@@ -23,8 +23,8 @@
       <div v-else class="text-gray-400 text-xs p-2">暂无用户文件</div>
     </div>
 
-    <div class="file-section readonly-section">
-      <div class="section-header">
+    <div class="mb-2">
+      <div class="flex justify-between items-center px-3 py-2 pb-1 border-b border-gray-200/60 bg-gray-50">
         <span class="font-medium text-gray-500">系统文件（只读）</span>
       </div>
       <div v-if="readonlyFiles.length > 0">
@@ -109,20 +109,3 @@ function filterFiles(fileList: ProjectFile[], readonly: boolean): ProjectFile[] 
 }
 </script>
 
-<style scoped>
-.file-section {
-  margin-bottom: 8px;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px 4px;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.readonly-section .section-header {
-  background: #fafafa;
-}
-</style>

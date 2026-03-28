@@ -1,6 +1,6 @@
 <template>
-  <div class="vue-repl-preview">
-    <div v-if="!hasFiles" class="empty-container">
+  <div class="h-full flex flex-col bg-white">
+    <div v-if="!hasFiles" class="flex-1 flex items-center justify-center">
       <el-empty :description="emptyText" :image-size="80">
         <template #image>
           <span class="text-5xl">{{ emptyIcon }}</span>
@@ -8,9 +8,9 @@
       </el-empty>
     </div>
     <template v-else>
-      <div v-if="showToolbar" class="preview-toolbar">
+      <div v-if="showToolbar" class="flex justify-between items-center px-4 py-2 border-b border-gray-200 shrink-0">
         <slot name="toolbar-left" />
-        <div class="toolbar-right">
+        <div class="flex gap-2">
           <el-button
             type="primary"
             size="small"
@@ -21,8 +21,8 @@
           </el-button>
         </div>
       </div>
-      <div class="repl-wrapper" :class="{ fullscreen }">
-        <div v-if="!isReplReady" class="preview-loading">
+      <div class="repl-wrapper flex-1 overflow-hidden relative" :class="{ fullscreen }">
+        <div v-if="!isReplReady" class="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-white z-10 text-gray-400 text-sm">
           <el-icon class="is-loading"><Loading /></el-icon>
           <span>{{ loadingText }}</span>
         </div>
@@ -116,58 +116,6 @@ defineExpose({
 </script>
 
 <style scoped>
-.vue-repl-preview {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-}
-
-.empty-container {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.preview-toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 16px;
-  border-bottom: 1px solid #e4e7ed;
-  flex-shrink: 0;
-}
-
-.toolbar-right {
-  display: flex;
-  gap: 8px;
-}
-
-.repl-wrapper {
-  flex: 1;
-  overflow: hidden;
-  position: relative;
-}
-
-.preview-loading {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  background: #fff;
-  z-index: 10;
-  color: #909399;
-  font-size: 14px;
-}
-
-.preview-loading .el-icon {
-  font-size: 24px;
-}
-
 .repl-wrapper :deep(.split-pane > .left),
 .repl-wrapper :deep(.split-pane > .dragger) {
   display: none !important;

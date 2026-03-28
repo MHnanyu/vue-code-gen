@@ -1,7 +1,7 @@
 <template>
-  <div class="markdown-preview">
+  <div class="p-4 overflow-y-auto h-full">
     <el-skeleton v-if="loading" :rows="8" animated />
-    <div v-else-if="content" class="markdown-body" v-html="renderedContent" />
+    <div v-else-if="content" class="markdown-body text-sm leading-relaxed text-gray-800" v-html="renderedContent" />
     <el-empty v-else description="暂无预览内容" :image-size="60" />
   </div>
 </template>
@@ -22,18 +22,6 @@ const renderedContent = computed(() => {
 </script>
 
 <style scoped>
-.markdown-preview {
-  padding: 16px;
-  overflow-y: auto;
-  height: 100%;
-}
-
-.markdown-body {
-  font-size: 14px;
-  line-height: 1.6;
-  color: #303133;
-}
-
 .markdown-body :deep(h1) {
   font-size: 20px;
   margin: 16px 0 8px;

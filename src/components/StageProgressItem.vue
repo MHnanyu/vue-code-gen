@@ -1,57 +1,60 @@
 <template>
   <div
-    class="stage-item"
-    :class="{ active: stage.status === 'running' }"
+    class="flex items-center gap-2.5 px-2.5 py-1.5 rounded-md cursor-pointer transition-colors duration-200 min-h-12 hover:bg-gray-100"
+    :class="{ 'bg-blue-50': stage.status === 'running' }"
   >
-    <div class="stage-left" @click="$emit('click', stage)">
+    <div class="flex flex-col items-center w-5 shrink-0" @click="$emit('click', stage)">
       <div
         v-if="index > 0"
-        class="stage-line"
-        :class="topLineClass"
+        class="w-0.5 flex-1 min-h-1"
+        :class="topLineClass === 'line-done' ? 'bg-green-500' : 'bg-gray-300'"
       />
-      <div v-else class="stage-line-spacer" />
-      <div class="stage-icon" :class="iconClass">
+      <div v-else class="flex-1 min-h-1" />
+      <div
+        class="w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-xs"
+        :class="iconStyle"
+      >
         <el-icon v-if="stage.status === 'running'" class="is-loading"><Loading /></el-icon>
         <el-icon v-else-if="stage.status === 'success'"><Check /></el-icon>
         <el-icon v-else-if="stage.status === 'cached'"><Check /></el-icon>
         <el-icon v-else-if="stage.status === 'skipped'"><SemiSelect /></el-icon>
         <el-icon v-else-if="stage.status === 'failed'"><WarningFilled /></el-icon>
         <el-icon v-else-if="stage.status === 'cancelled'"><Remove /></el-icon>
-        <span v-else class="stage-dot" />
+        <span v-else class="w-1.5 h-1.5 rounded-full bg-gray-300" />
       </div>
       <div
         v-if="index < total - 1"
-        class="stage-line"
-        :class="bottomLineClass"
+        class="w-0.5 flex-1 min-h-1"
+        :class="bottomLineClass === 'line-done' ? 'bg-green-500' : 'bg-gray-300'"
       />
-      <div v-else class="stage-line-spacer" />
+      <div v-else class="flex-1 min-h-1" />
     </div>
-    <div class="stage-right" @click="$emit('click', stage)">
-      <div class="stage-header">
-        <span class="stage-name">{{ STAGE_NAME_MAP[stage.stageName] || stage.stageName }}</span>
-        <el-tag v-if="stage.status === 'cached'" size="small" type="info" class="stage-badge">缓存</el-tag>
-        <el-tag v-else-if="stage.status === 'skipped'" size="small" type="info" class="stage-badge">跳过</el-tag>
-        <el-tag v-else-if="stage.status === 'cancelled'" size="small" type="warning" class="stage-badge">已取消</el-tag>
+    <div class="flex-1 min-w-0 p-0 flex flex-col justify-center min-h-11" @click="$emit('click', stage)">
+      <div class="flex items-center gap-1.5">
+        <span class="text-[13px] font-medium text-gray-800">{{ STAGE_NAME_MAP[stage.stageName] || stage.stageName }}</span>
+        <el-tag v-if="stage.status === 'cached'" size="small" type="info" class="scale-85 align-middle">缓存</el-tag>
+        <el-tag v-else-if="stage.status === 'skipped'" size="small" type="info" class="scale-85 align-middle">跳过</el-tag>
+        <el-tag v-else-if="stage.status === 'cancelled'" size="small" type="warning" class="scale-85 align-middle">已取消</el-tag>
       </div>
-      <div class="stage-meta">
-        <span v-if="stage.duration != null" class="stage-duration">
-          <el-icon><Timer /></el-icon>
+      <div class="flex items-center gap-2 mt-1">
+        <span v-if="stage.duration != null" class="inline-flex items-center gap-0.5 text-xs text-gray-400">
+          <el-icon class="text-xs"><Timer /></el-icon>
           {{ stage.duration.toFixed(1) }}s
         </span>
         <div
           v-if="stage.progressMessage"
-          class="stage-progress-text"
+          class="stage-progress-text text-xs text-blue-500 max-h-[260px] overflow-y-auto"
           :class="{ 'text-success': stage.status === 'success' || stage.status === 'cached' }"
           v-html="renderMarkdown(stage.progressMessage)"
         />
       </div>
-      <div v-if="stage.status === 'failed'" class="stage-error">
+      <div v-if="stage.status === 'failed'" class="mt-1 text-xs text-red-500">
         {{ stage.progressMessage || '步骤执行失败' }}
       </div>
     </div>
     <span
       v-if="retryFn && isRetryable && !isStreaming"
-      class="stage-retry-btn"
+      class="text-xs text-amber-500 cursor-pointer ml-auto shrink-0 self-center px-1.5 py-0.5 rounded transition-colors duration-200 hover:bg-amber-50"
       @click.stop="retryFn(stage.stage)"
     >
       重试
@@ -102,173 +105,20 @@ const bottomLineClass = computed(() =>
   isDone(props.stage) ? 'line-done' : 'line-pending',
 )
 
-const iconClass = computed(() => {
+const iconStyle = computed(() => {
   switch (props.stage.status) {
-    case 'running': return 'icon-running'
-    case 'success': return 'icon-success'
-    case 'cached': return 'icon-cached'
-    case 'skipped': return 'icon-skipped'
-    case 'failed': return 'icon-failed'
-    case 'cancelled': return 'icon-cancelled'
-    default: return 'icon-pending'
+    case 'running': return 'bg-blue-500 text-white'
+    case 'success': return 'bg-green-500 text-white'
+    case 'cached': return 'bg-amber-400 text-white'
+    case 'skipped': return 'bg-amber-400 text-white opacity-60'
+    case 'failed': return 'bg-red-400 text-white'
+    case 'cancelled': return 'bg-amber-400 text-white opacity-70'
+    default: return 'border-2 border-gray-300'
   }
 })
 </script>
 
 <style scoped>
-.stage-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 10px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: background 0.2s;
-  min-height: 48px;
-}
-
-.stage-item:hover {
-  background: #f5f7fa;
-}
-
-.stage-item.active {
-  background: #ecf5ff;
-}
-
-.stage-left {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 20px;
-  flex-shrink: 0;
-}
-
-.stage-line {
-  width: 2px;
-  flex: 1;
-  min-height: 4px;
-}
-
-.line-done {
-  background: #67c23a;
-}
-
-.line-pending {
-  background: #dcdfe6;
-}
-
-.stage-line-spacer {
-  flex: 1;
-  min-height: 4px;
-}
-
-.stage-icon {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  font-size: 12px;
-}
-
-.icon-success {
-  background: #67c23a;
-  color: #fff;
-}
-
-.icon-cached {
-  background: #e6a23c;
-  color: #fff;
-}
-
-.icon-skipped {
-  background: #e6a23c;
-  color: #fff;
-  opacity: 0.6;
-}
-
-.icon-running {
-  background: #409eff;
-  color: #fff;
-}
-
-.icon-failed {
-  background: #f56c6c;
-  color: #fff;
-}
-
-.icon-cancelled {
-  background: #e6a23c;
-  color: #fff;
-  opacity: 0.7;
-}
-
-.icon-pending {
-  border: 2px solid #dcdfe6;
-}
-
-.stage-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: #dcdfe6;
-}
-
-.stage-right {
-  flex: 1;
-  min-width: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-height: 44px;
-}
-
-.stage-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.stage-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: #303133;
-}
-
-.stage-badge {
-  transform: scale(0.85);
-  vertical-align: middle;
-}
-
-.stage-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 4px;
-}
-
-.stage-duration {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 12px;
-  color: #909399;
-}
-
-.stage-duration .el-icon {
-  font-size: 12px;
-}
-
-.stage-progress-text {
-  font-size: 12px;
-  color: #409eff;
-  max-height: 260px;
-  overflow-y: auto;
-}
-
 .stage-progress-text :deep(.markdown-body),
 .stage-progress-text :deep(h1),
 .stage-progress-text :deep(h2),
@@ -331,27 +181,5 @@ const iconClass = computed(() => {
 .stage-progress-text.text-success :deep(th),
 .stage-progress-text.text-success :deep(span) {
   color: #909399;
-}
-
-.stage-error {
-  margin-top: 4px;
-  font-size: 12px;
-  color: #f56c6c;
-}
-
-.stage-retry-btn {
-  font-size: 12px;
-  color: #e6a23c;
-  cursor: pointer;
-  margin-left: auto;
-  flex-shrink: 0;
-  align-self: center;
-  padding: 2px 6px;
-  border-radius: 4px;
-  transition: background 0.2s;
-}
-
-.stage-retry-btn:hover {
-  background: #fdf6ec;
 }
 </style>

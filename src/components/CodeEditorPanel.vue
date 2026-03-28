@@ -1,6 +1,6 @@
 <template>
-  <div class="code-editor-wrapper flex-1 flex">
-    <div class="file-tree-panel">
+  <div class="flex-1 flex overflow-hidden">
+    <div class="w-[200px] shrink-0 border-r border-gray-200 overflow-y-auto">
       <FileTree
         :files="projectStore.files"
         :selected-file-id="projectStore.selectedFileId"
@@ -10,8 +10,8 @@
         @rename="handleRenameFile"
       />
     </div>
-    <div class="editor-panel flex-1">
-      <div v-if="selectedFile" class="editor-header">
+    <div class="editor-panel flex-1 flex flex-col overflow-hidden">
+      <div v-if="selectedFile" class="flex items-center gap-2 px-4 py-2 bg-white border-b border-gray-200 text-[13px]">
         <span>{{ selectedFile.name }}</span>
         <el-tag v-if="selectedFile.readonly" size="small" type="info">只读</el-tag>
       </div>
@@ -72,33 +72,6 @@ function handleContentChange(content: string) {
 </script>
 
 <style scoped>
-.code-editor-wrapper {
-  overflow: hidden;
-}
-
-.file-tree-panel {
-  width: 200px;
-  flex-shrink: 0;
-  border-right: 1px solid #e4e7ed;
-  overflow-y: auto;
-}
-
-.editor-panel {
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.editor-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  background: #fff;
-  border-bottom: 1px solid #e4e7ed;
-  font-size: 13px;
-}
-
 .editor-panel :deep(.monaco-editor-container) {
   flex: 1;
 }

@@ -24,7 +24,7 @@
         <input
           ref="inputRef"
           v-model="editName"
-          class="edit-input"
+          class="flex-1 max-w-[120px] h-[22px] px-1.5 border border-blue-500 rounded outline-none text-sm leading-5 bg-white"
           @click.stop
           @blur="handleRenameSubmit"
           @keyup.enter="handleRenameSubmit"
@@ -165,18 +165,3 @@ function getFileIconColor(language: string): string {
 }
 </script>
 
-<style scoped>
-.edit-input {
-  flex: 1;
-  max-width: 120px;
-  height: 22px;
-  padding: 0 6px;
-  border: 1px solid #409eff;
-  border-radius: 4px;
-  outline: none;
-  font-size: inherit;
-  font-family: inherit;
-  line-height: 20px;
-  background: #fff;
-}
-</style>

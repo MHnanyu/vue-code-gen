@@ -79,7 +79,7 @@
           </div>
         </div>
       </div>
-      <el-empty v-else description="开始新的对话吧" :image-size="80">
+      <el-empty v-else description="开始新的对话吧" :image-size="80" class="empty-box">
         <template #image>
           <span class="text-5xl">💬</span>
         </template>
@@ -191,7 +191,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-:deep(.el-empty) {
+.empty-box :deep(.el-empty) {
   flex: 1;
   display: flex;
   flex-direction: column;

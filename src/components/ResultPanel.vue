@@ -8,14 +8,14 @@
       </el-empty>
     </div>
     <template v-else>
-      <div class="toolbar">
-        <el-tabs v-model="activeTab" class="result-tabs">
+      <div class="flex justify-between items-center shrink-0 border-b border-gray-200 bg-white">
+        <el-tabs v-model="activeTab" class="flex-1 result-tabs">
           <el-tab-pane label="Preview" name="preview" />
           <el-tab-pane label="Code" name="code" />
           <el-tab-pane v-if="hasStageContent" label="步骤产物" name="stages" />
         </el-tabs>
-        <div v-if="activeTab !== 'stages'" class="toolbar-actions">
-          <div class="tech-tags">
+        <div v-if="activeTab !== 'stages'" class="flex gap-1 px-3 items-center">
+          <div class="flex gap-1.5 mr-1.5 pr-2.5 border-r border-gray-200">
             <el-tag type="success" effect="plain" size="small">Vue3</el-tag>
             <el-tag effect="plain" size="small">{{ componentLibLabel }}</el-tag>
           </div>
@@ -260,19 +260,6 @@ async function exportProject() {
 </script>
 
 <style scoped>
-.toolbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-shrink: 0;
-  border-bottom: 1px solid #e4e7ed;
-  background: #fff;
-}
-
-.result-tabs {
-  flex: 1;
-}
-
 .result-tabs :deep(.el-tabs__header) {
   margin: 0;
   padding: 0 16px;
@@ -282,20 +269,5 @@ async function exportProject() {
 
 .result-tabs :deep(.el-tabs__content) {
   display: none;
-}
-
-.toolbar-actions {
-  display: flex;
-  gap: 4px;
-  padding: 0 12px;
-  align-items: center;
-}
-
-.tech-tags {
-  display: flex;
-  gap: 6px;
-  margin-right: 6px;
-  padding-right: 10px;
-  border-right: 1px solid #e4e7ed;
 }
 </style>
