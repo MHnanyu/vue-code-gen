@@ -1,4 +1,4 @@
-﻿import { defineStore } from 'pinia'
+import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 export interface PreviewState {
@@ -15,6 +15,12 @@ const VIEWPORT_WIDTHS: Record<PreviewState['viewport'], number> = {
   desktop: 1280
 }
 
+function escapeHtmlClosingTags(content: string): string {
+  return content
+    .replace(/<\/script/gi, '<\\/script')
+    .replace(/<\/style/gi, '<\\/style')
+}
+
 export const usePreviewStore = defineStore('preview', () => {
   const html = ref('')
   const css = ref('')
@@ -24,7 +30,12 @@ export const usePreviewStore = defineStore('preview', () => {
 
   const viewportWidth = computed(() => VIEWPORT_WIDTHS[viewport.value])
 
-  const combinedHtml = computed(() => `<!DOCTYPE html>
+  const combinedHtml = computed(() => {
+    const safeHtml = escapeHtmlClosingTags(html.value)
+    const safeCss = escapeHtmlClosingTags(css.value)
+    const safeJs = escapeHtmlClosingTags(javascript.value)
+
+    return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
@@ -37,7 +48,7 @@ export const usePreviewStore = defineStore('preview', () => {
   <style>
     * { box-sizing: border-box; }
     body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
-    ${css.value}
+    ${safeCss}
   </style>
 </head>
 <body>
@@ -50,9 +61,9 @@ export const usePreviewStore = defineStore('preview', () => {
     try {
       const app = createApp({
         setup() {
-          ${javascript.value}
+          ${safeJs}
         },
-        template: \`${html.value}\`
+        template: \`${safeHtml}\`
       });
       
       Object.keys(Icons).forEach(key => {
@@ -67,7 +78,8 @@ export const usePreviewStore = defineStore('preview', () => {
     }
   <\/script>
 </body>
-</html>`)
+</html>`
+  })
 
   const setHtml = (content: string) => { html.value = content }
   const setCss = (content: string) => { css.value = content }
