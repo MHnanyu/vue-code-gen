@@ -244,8 +244,9 @@ export const PACKAGE_JSON = JSON.stringify({
   },
   devDependencies: {
     '@vitejs/plugin-vue': '^6.0.0',
-    tailwindcss: '^4.0.0',
-    '@tailwindcss/vite': '^4.0.0',
+    tailwindcss: '^3.4.0',
+    autoprefixer: '^10.4.0',
+    postcss: '^8.4.0',
     typescript: '^5.9.0',
     vite: '^7.0.0',
     'vue-tsc': '^3.0.0'
@@ -254,11 +255,10 @@ export const PACKAGE_JSON = JSON.stringify({
 
 export const VITE_CONFIG_TS = `import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
-import tailwindcss from '@tailwindcss/vite'
 import { resolve } from 'path'
 
 export default defineConfig({
-  plugins: [vue(), tailwindcss()],
+  plugins: [vue()],
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src')
@@ -267,7 +267,9 @@ export default defineConfig({
 })
 `
 
-export const STYLE_CSS = `@import "tailwindcss";
+export const STYLE_CSS = `@tailwind base;
+@tailwind components;
+@tailwind utilities;
 `
 
 export const TS_CONFIG = `{
@@ -303,6 +305,28 @@ declare module '*.vue' {
   import type { DefineComponent } from 'vue'
   const component: DefineComponent<{}, {}, any>
   export default component
+}
+`
+
+export const TAILWIND_CONFIG_TS = `import type { Config } from 'tailwindcss'
+
+export default {
+  content: [
+    './index.html',
+    './src/**/*.{vue,js,ts,jsx,tsx}',
+  ],
+  theme: {
+    extend: {},
+  },
+  plugins: [],
+} satisfies Config
+`
+
+export const POSTCSS_CONFIG_JS = `export default {
+  plugins: {
+    tailwindcss: {},
+    autoprefixer: {},
+  },
 }
 `
 
@@ -379,6 +403,24 @@ export function getBaseProjectFiles(componentLib: ComponentLib = 'ElementUI'): P
       language: 'json',
       content: TS_CONFIG,
       readonly: true
+    },
+    {
+      id: 'tailwind-config',
+      name: 'tailwind.config.ts',
+      path: '/tailwind.config.ts',
+      type: 'file',
+      language: 'typescript',
+      content: TAILWIND_CONFIG_TS,
+      readonly: true
+    },
+    {
+      id: 'postcss-config',
+      name: 'postcss.config.js',
+      path: '/postcss.config.js',
+      type: 'file',
+      language: 'javascript',
+      content: POSTCSS_CONFIG_JS,
+      readonly: true
     }
   ]
 }
@@ -426,6 +468,8 @@ export function buildProjectFiles(
     baseFiles[4],
     baseFiles[5],
     baseFiles[6],
-    baseFiles[7]
+    baseFiles[7],
+    baseFiles[8],
+    baseFiles[9]
   ]
 }
