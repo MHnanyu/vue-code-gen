@@ -247,6 +247,16 @@ export const useChatStore = defineStore('chat', () => {
     pendingAttachments.value = []
   }
 
+  function removeLastAssistantMessage(sessionId: string, onlyIfFailed = false): void {
+    const session = sessions.value.find(s => s.id === sessionId)
+    if (!session) return
+    const msgs = session.messages
+    const lastIdx = msgs.length - 1
+    if (lastIdx < 0 || msgs[lastIdx].role !== 'assistant') return
+    if (onlyIfFailed && msgs[lastIdx].failedStep == null) return
+    msgs.splice(lastIdx, 1)
+  }
+
   function updateSessionFiles(sessionId: string, files: ChatSession['files']) {
     const session = sessions.value.find(s => s.id === sessionId)
     if (session) {
@@ -285,6 +295,7 @@ export const useChatStore = defineStore('chat', () => {
     setPendingPrompt,
     setPendingAttachments,
     clearPendingAttachments,
+    removeLastAssistantMessage,
     updateSessionFiles,
     resetStageProgresses,
     setStageProgresses,

@@ -13,6 +13,7 @@ export interface Stages {
   requirement?: StageInfo
   generation?: StageInfo
   optimization?: StageInfo
+  [key: string]: StageInfo | undefined
 }
 
 export interface StepMessage {
