@@ -15,8 +15,11 @@ const VIEWPORT_WIDTHS: Record<PreviewState['viewport'], number> = {
   desktop: 1280
 }
 
-function escapeHtmlClosingTags(content: string): string {
+function escapeForTemplateLiteral(content: string): string {
   return content
+    .replace(/\\/g, '\\\\')
+    .replace(/`/g, '\\`')
+    .replace(/\$/g, '\\$')
     .replace(/<\/script/gi, '<\\/script')
     .replace(/<\/style/gi, '<\\/style')
 }
@@ -31,9 +34,9 @@ export const usePreviewStore = defineStore('preview', () => {
   const viewportWidth = computed(() => VIEWPORT_WIDTHS[viewport.value])
 
   const combinedHtml = computed(() => {
-    const safeHtml = escapeHtmlClosingTags(html.value)
-    const safeCss = escapeHtmlClosingTags(css.value)
-    const safeJs = escapeHtmlClosingTags(javascript.value)
+    const safeHtml = escapeForTemplateLiteral(html.value)
+    const safeCss = escapeForTemplateLiteral(css.value)
+    const safeJs = escapeForTemplateLiteral(javascript.value)
 
     return `<!DOCTYPE html>
 <html lang="zh-CN">

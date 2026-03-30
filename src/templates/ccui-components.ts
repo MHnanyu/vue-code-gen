@@ -194,4 +194,19 @@ export function getCcuiComponentsAsProjectFiles(): ProjectFile[] {
   return [ccuiFolder]
 }
 
+export interface CcuiComponentReg {
+  importPath: string
+  importName: string
+  regName: string
+}
+
+export const CCUI_COMPONENT_REGISTRY: CcuiComponentReg[] = CCUI_COMPONENT_FILES.map(f => {
+  const baseName = f.name.replace('.vue', '')
+  return {
+    importPath: `./${f.path}`,
+    importName: `Cc${baseName}`,
+    regName: `Cc${baseName}`,
+  }
+})
+
 

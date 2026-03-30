@@ -1,334 +1,35 @@
 import type { ProjectFile, ComponentLib } from '@/types'
-import { getCcuiComponentsAsProjectFiles } from './ccui-components'
+import {
+  APP_VUE,
+  INDEX_HTML,
+  PACKAGE_JSON,
+  VITE_CONFIG_TS,
+  STYLE_CSS,
+  TS_CONFIG,
+  VITE_ENV_D_TS,
+  TAILWIND_CONFIG_TS,
+  POSTCSS_CONFIG_JS,
+} from './common'
+import { getLibAdapter } from './lib-adapter'
+
+import './element-ui'
+import './ccui-adapter'
+
+export {
+  APP_VUE,
+  INDEX_HTML,
+  PACKAGE_JSON,
+  VITE_CONFIG_TS,
+  STYLE_CSS,
+  TS_CONFIG,
+  VITE_ENV_D_TS,
+  TAILWIND_CONFIG_TS,
+  POSTCSS_CONFIG_JS,
+}
 
 export function getMainTs(componentLib: ComponentLib = 'ElementUI'): string {
-  if (componentLib === 'ccui') {
-    return `import { createApp } from 'vue'
-import ElementPlus from 'element-plus'
-import 'element-plus/dist/index.css'
-import './style.css'
-import App from './App.vue'
-
-import CcAffix from './ccui/Affix.vue'
-import CcAnchor from './ccui/Anchor.vue'
-import CcAutocomplete from './ccui/Autocomplete.vue'
-import CcAvatar from './ccui/Avatar.vue'
-import CcBacktop from './ccui/Backtop.vue'
-import CcBorder from './ccui/Border.vue'
-import CcBreadcrumb from './ccui/Breadcrumb.vue'
-import CcBreadcrumbItem from './ccui/BreadcrumbItem.vue'
-import CcButton from './ccui/Button.vue'
-import CcCard from './ccui/Card.vue'
-import CcCascader from './ccui/Cascader.vue'
-import CcCheckbox from './ccui/Checkbox.vue'
-import CcCheckboxButton from './ccui/CheckboxButton.vue'
-import CcCheckboxGroup from './ccui/CheckboxGroup.vue'
-import CcCollapse from './ccui/Collapse.vue'
-import CcCollapseItem from './ccui/CollapseItem.vue'
-import CcColor from './ccui/Color.vue'
-import CcColorPicker from './ccui/ColorPicker.vue'
-import CcContainer from './ccui/Container.vue'
-import CcContainerHeader from './ccui/ContainerHeader.vue'
-import CcContainerAside from './ccui/ContainerAside.vue'
-import CcContainerMain from './ccui/ContainerMain.vue'
-import CcContainerFooter from './ccui/ContainerFooter.vue'
-import CcDatePicker from './ccui/DatePicker.vue'
-import CcDateTimePicker from './ccui/DateTimePicker.vue'
-import CcDescriptions from './ccui/Descriptions.vue'
-import CcDescriptionsItem from './ccui/DescriptionsItem.vue'
-import CcDialog from './ccui/Dialog.vue'
-import CcDivider from './ccui/Divider.vue'
-import CcDrawer from './ccui/Drawer.vue'
-import CcDropdown from './ccui/Dropdown.vue'
-import CcEllipsis from './ccui/Ellipsis.vue'
-import CcForm from './ccui/Form.vue'
-import CcFormItem from './ccui/FormItem.vue'
-import CcIcon from './ccui/Icon.vue'
-import CcImage from './ccui/Image.vue'
-import CcInput from './ccui/Input.vue'
-import CcInputNumber from './ccui/InputNumber.vue'
-import CcInputTag from './ccui/InputTag.vue'
-import CcLayoutRow from './ccui/LayoutRow.vue'
-import CcLayoutCol from './ccui/LayoutCol.vue'
-import CcLink from './ccui/Link.vue'
-import CcMenu from './ccui/Menu.vue'
-import CcMenuItem from './ccui/MenuItem.vue'
-import CcMenuItemGroup from './ccui/MenuItemGroup.vue'
-import CcSubMenu from './ccui/SubMenu.vue'
-import CcMention from './ccui/Mention.vue'
-import CcMessage from './ccui/Message.vue'
-import CcMessageBox from './ccui/MessageBox.vue'
-import CcOption from './ccui/Option.vue'
-import CcOptionGroup from './ccui/OptionGroup.vue'
-import CcPageHeader from './ccui/PageHeader.vue'
-import CcPagination from './ccui/Pagination.vue'
-import CcPopconfirm from './ccui/Popconfirm.vue'
-import CcPopover from './ccui/Popover.vue'
-import CcRadio from './ccui/Radio.vue'
-import CcRate from './ccui/Rate.vue'
-import CcResult from './ccui/Result.vue'
-import CcScrollbar from './ccui/Scrollbar.vue'
-import CcSegmented from './ccui/Segmented.vue'
-import CcSelect from './ccui/Select.vue'
-import CcSlider from './ccui/Slider.vue'
-import CcSpace from './ccui/Space.vue'
-import CcStatistic from './ccui/Statistic.vue'
-import CcStep from './ccui/Step.vue'
-import CcSteps from './ccui/Steps.vue'
-import CcSwitch from './ccui/Switch.vue'
-import CcTabPane from './ccui/TabPane.vue'
-import CcTable from './ccui/Table.vue'
-import CcTabs from './ccui/Tabs.vue'
-import CcTag from './ccui/Tag.vue'
-import CcTimePicker from './ccui/TimePicker.vue'
-import CcTimeSelect from './ccui/TimeSelect.vue'
-import CcTooltip from './ccui/Tooltip.vue'
-import CcTransfer from './ccui/Transfer.vue'
-import CcTree from './ccui/Tree.vue'
-import CcTreeSelect from './ccui/TreeSelect.vue'
-import CcTypography from './ccui/Typography.vue'
-import CcTypographyText from './ccui/TypographyText.vue'
-import CcTypographyTitle from './ccui/TypographyTitle.vue'
-import CcTypographyParagraph from './ccui/TypographyParagraph.vue'
-import CcTypographyLink from './ccui/TypographyLink.vue'
-import CcUpload from './ccui/Upload.vue'
-import CcVirtualizedSelect from './ccui/VirtualizedSelect.vue'
-
-const app = createApp(App)
-app.use(ElementPlus)
-
-app.component('CcAffix', CcAffix)
-app.component('CcAnchor', CcAnchor)
-app.component('CcAutocomplete', CcAutocomplete)
-app.component('CcAvatar', CcAvatar)
-app.component('CcBacktop', CcBacktop)
-app.component('CcBorder', CcBorder)
-app.component('CcBreadcrumb', CcBreadcrumb)
-app.component('CcBreadcrumbItem', CcBreadcrumbItem)
-app.component('CcButton', CcButton)
-app.component('CcCard', CcCard)
-app.component('CcCascader', CcCascader)
-app.component('CcCheckbox', CcCheckbox)
-app.component('CcCheckboxButton', CcCheckboxButton)
-app.component('CcCheckboxGroup', CcCheckboxGroup)
-app.component('CcCollapse', CcCollapse)
-app.component('CcCollapseItem', CcCollapseItem)
-app.component('CcColor', CcColor)
-app.component('CcColorPicker', CcColorPicker)
-app.component('CcContainer', CcContainer)
-app.component('CcContainerHeader', CcContainerHeader)
-app.component('CcContainerAside', CcContainerAside)
-app.component('CcContainerMain', CcContainerMain)
-app.component('CcContainerFooter', CcContainerFooter)
-app.component('CcDatePicker', CcDatePicker)
-app.component('CcDateTimePicker', CcDateTimePicker)
-app.component('CcDescriptions', CcDescriptions)
-app.component('CcDescriptionsItem', CcDescriptionsItem)
-app.component('CcDialog', CcDialog)
-app.component('CcDivider', CcDivider)
-app.component('CcDrawer', CcDrawer)
-app.component('CcDropdown', CcDropdown)
-app.component('CcEllipsis', CcEllipsis)
-app.component('CcForm', CcForm)
-app.component('CcFormItem', CcFormItem)
-app.component('CcIcon', CcIcon)
-app.component('CcImage', CcImage)
-app.component('CcInput', CcInput)
-app.component('CcInputNumber', CcInputNumber)
-app.component('CcInputTag', CcInputTag)
-app.component('CcRow', CcLayoutRow)
-app.component('CcCol', CcLayoutCol)
-app.component('CcLink', CcLink)
-app.component('CcMenu', CcMenu)
-app.component('CcMenuItem', CcMenuItem)
-app.component('CcMenuItemGroup', CcMenuItemGroup)
-app.component('CcSubMenu', CcSubMenu)
-app.component('CcMention', CcMention)
-app.component('CcMessage', CcMessage)
-app.component('CcMessageBox', CcMessageBox)
-app.component('CcOption', CcOption)
-app.component('CcOptionGroup', CcOptionGroup)
-app.component('CcPageHeader', CcPageHeader)
-app.component('CcPagination', CcPagination)
-app.component('CcPopconfirm', CcPopconfirm)
-app.component('CcPopover', CcPopover)
-app.component('CcRadio', CcRadio)
-app.component('CcRate', CcRate)
-app.component('CcResult', CcResult)
-app.component('CcScrollbar', CcScrollbar)
-app.component('CcSegmented', CcSegmented)
-app.component('CcSelect', CcSelect)
-app.component('CcSlider', CcSlider)
-app.component('CcSpace', CcSpace)
-app.component('CcStatistic', CcStatistic)
-app.component('CcStep', CcStep)
-app.component('CcSteps', CcSteps)
-app.component('CcSwitch', CcSwitch)
-app.component('CcTabPane', CcTabPane)
-app.component('CcTable', CcTable)
-app.component('CcTabs', CcTabs)
-app.component('CcTag', CcTag)
-app.component('CcTimePicker', CcTimePicker)
-app.component('CcTimeSelect', CcTimeSelect)
-app.component('CcTooltip', CcTooltip)
-app.component('CcTransfer', CcTransfer)
-app.component('CcTree', CcTree)
-app.component('CcTreeSelect', CcTreeSelect)
-app.component('CcTypography', CcTypography)
-app.component('CcTypographyText', CcTypographyText)
-app.component('CcTypographyTitle', CcTypographyTitle)
-app.component('CcTypographyParagraph', CcTypographyParagraph)
-app.component('CcTypographyLink', CcTypographyLink)
-app.component('CcUpload', CcUpload)
-app.component('CcVirtualizedSelect', CcVirtualizedSelect)
-
-app.mount('#app')
-`
-  }
-
-  return `import { createApp } from 'vue'
-import ElementPlus from 'element-plus'
-import 'element-plus/dist/index.css'
-import './style.css'
-import App from './App.vue'
-
-const app = createApp(App)
-app.use(ElementPlus)
-app.mount('#app')
-`
+  return getLibAdapter(componentLib).getMainTs()
 }
-
-export const APP_VUE = `<template>
-  <div id="app">
-    <MainPage />
-  </div>
-</template>
-
-<script setup lang="ts">
-import MainPage from './MainPage.vue'
-</script>
-
-<style>
-#app {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  -webkit-font-smoothing: antialiased;
-}
-</style>
-`
-
-export const INDEX_HTML = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vue 3 App</title>
-</head>
-<body>
-  <div id="app"></div>
-  <script type="module" src="/src/main.ts"></script>
-</body>
-</html>
-`
-
-export const PACKAGE_JSON = JSON.stringify({
-  name: 'vue-generated-app',
-  version: '0.1.0',
-  scripts: {
-    dev: 'vite',
-    build: 'vue-tsc && vite build',
-    preview: 'vite preview'
-  },
-  dependencies: {
-    vue: '^3.5.0',
-    'element-plus': '^2.9.0'
-  },
-  devDependencies: {
-    '@vitejs/plugin-vue': '^6.0.0',
-    tailwindcss: '^3.4.0',
-    autoprefixer: '^10.4.0',
-    postcss: '^8.4.0',
-    typescript: '^5.9.0',
-    vite: '^7.0.0',
-    'vue-tsc': '^3.0.0'
-  }
-}, null, 2)
-
-export const VITE_CONFIG_TS = `import { defineConfig } from 'vite'
-import vue from '@vitejs/plugin-vue'
-import { resolve } from 'path'
-
-export default defineConfig({
-  plugins: [vue()],
-  resolve: {
-    alias: {
-      '@': resolve(__dirname, 'src')
-    }
-  }
-})
-`
-
-export const STYLE_CSS = `@tailwind base;
-@tailwind components;
-@tailwind utilities;
-`
-
-export const TS_CONFIG = `{
-  "compilerOptions": {
-    "target": "ES2020",
-    "useDefineForClassFields": true,
-    "module": "ESNext",
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "skipLibCheck": true,
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "isolatedModules": true,
-    "moduleDetection": "force",
-    "noEmit": true,
-    "jsx": "preserve",
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true,
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["src/*"]
-    }
-  },
-  "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.vue"]
-}
-`
-
-export const VITE_ENV_D_TS = `/// <reference types="vite/client" />
-
-declare module '*.vue' {
-  import type { DefineComponent } from 'vue'
-  const component: DefineComponent<{}, {}, any>
-  export default component
-}
-`
-
-export const TAILWIND_CONFIG_TS = `import type { Config } from 'tailwindcss'
-
-export default {
-  content: [
-    './index.html',
-    './src/**/*.{vue,js,ts,jsx,tsx}',
-  ],
-  theme: {
-    extend: {},
-  },
-  plugins: [],
-} satisfies Config
-`
-
-export const POSTCSS_CONFIG_JS = `export default {
-  plugins: {
-    tailwindcss: {},
-    autoprefixer: {},
-  },
-}
-`
 
 export function getBaseProjectFiles(componentLib: ComponentLib = 'ElementUI'): ProjectFile[] {
   return [
@@ -339,7 +40,7 @@ export function getBaseProjectFiles(componentLib: ComponentLib = 'ElementUI'): P
       type: 'file',
       language: 'typescript',
       content: getMainTs(componentLib),
-      readonly: true
+      readonly: true,
     },
     {
       id: 'app-vue',
@@ -348,7 +49,7 @@ export function getBaseProjectFiles(componentLib: ComponentLib = 'ElementUI'): P
       type: 'file',
       language: 'vue',
       content: APP_VUE,
-      readonly: true
+      readonly: true,
     },
     {
       id: 'style-css',
@@ -357,7 +58,7 @@ export function getBaseProjectFiles(componentLib: ComponentLib = 'ElementUI'): P
       type: 'file',
       language: 'css',
       content: STYLE_CSS,
-      readonly: true
+      readonly: true,
     },
     {
       id: 'vite-env-d-ts',
@@ -366,7 +67,7 @@ export function getBaseProjectFiles(componentLib: ComponentLib = 'ElementUI'): P
       type: 'file',
       language: 'typescript',
       content: VITE_ENV_D_TS,
-      readonly: true
+      readonly: true,
     },
     {
       id: 'index-html',
@@ -375,7 +76,7 @@ export function getBaseProjectFiles(componentLib: ComponentLib = 'ElementUI'): P
       type: 'file',
       language: 'html',
       content: INDEX_HTML,
-      readonly: true
+      readonly: true,
     },
     {
       id: 'package-json',
@@ -384,7 +85,7 @@ export function getBaseProjectFiles(componentLib: ComponentLib = 'ElementUI'): P
       type: 'file',
       language: 'json',
       content: PACKAGE_JSON,
-      readonly: true
+      readonly: true,
     },
     {
       id: 'vite-config',
@@ -393,7 +94,7 @@ export function getBaseProjectFiles(componentLib: ComponentLib = 'ElementUI'): P
       type: 'file',
       language: 'typescript',
       content: VITE_CONFIG_TS,
-      readonly: true
+      readonly: true,
     },
     {
       id: 'tsconfig-json',
@@ -402,7 +103,7 @@ export function getBaseProjectFiles(componentLib: ComponentLib = 'ElementUI'): P
       type: 'file',
       language: 'json',
       content: TS_CONFIG,
-      readonly: true
+      readonly: true,
     },
     {
       id: 'tailwind-config',
@@ -411,7 +112,7 @@ export function getBaseProjectFiles(componentLib: ComponentLib = 'ElementUI'): P
       type: 'file',
       language: 'typescript',
       content: TAILWIND_CONFIG_TS,
-      readonly: true
+      readonly: true,
     },
     {
       id: 'postcss-config',
@@ -420,8 +121,8 @@ export function getBaseProjectFiles(componentLib: ComponentLib = 'ElementUI'): P
       type: 'file',
       language: 'javascript',
       content: POSTCSS_CONFIG_JS,
-      readonly: true
-    }
+      readonly: true,
+    },
   ]
 }
 
@@ -436,10 +137,11 @@ export function buildProjectFiles(
     path: '/src/MainPage.vue',
     type: 'file',
     language: 'vue',
-    content: mainPageContent
+    content: mainPageContent,
   }
 
   const baseFiles = getBaseProjectFiles(componentLib)
+  const adapter = getLibAdapter(componentLib)
 
   const srcChildren: ProjectFile[] = [
     baseFiles[0],
@@ -447,20 +149,16 @@ export function buildProjectFiles(
     baseFiles[2],
     baseFiles[3],
     mainPageFile,
-    ...extraComponents
+    ...extraComponents,
+    ...adapter.getExtraSrcChildren(),
   ]
-
-  if (componentLib === 'ccui') {
-    const ccuiFiles = getCcuiComponentsAsProjectFiles()
-    srcChildren.push(ccuiFiles[0])
-  }
 
   const srcFolder: ProjectFile = {
     id: 'src-folder',
     name: 'src',
     path: '/src',
     type: 'folder',
-    children: srcChildren
+    children: srcChildren,
   }
 
   return [
@@ -470,6 +168,6 @@ export function buildProjectFiles(
     baseFiles[6],
     baseFiles[7],
     baseFiles[8],
-    baseFiles[9]
+    baseFiles[9],
   ]
 }
