@@ -2,7 +2,7 @@ import type { ProjectFile, ComponentLib } from '@/types'
 import {
   APP_VUE,
   INDEX_HTML,
-  PACKAGE_JSON,
+  buildPackageJson,
   VITE_CONFIG_TS,
   STYLE_CSS,
   TS_CONFIG,
@@ -18,7 +18,7 @@ import './ccui-adapter'
 export {
   APP_VUE,
   INDEX_HTML,
-  PACKAGE_JSON,
+  buildPackageJson,
   VITE_CONFIG_TS,
   STYLE_CSS,
   TS_CONFIG,
@@ -32,6 +32,9 @@ export function getMainTs(componentLib: ComponentLib = 'ElementUI'): string {
 }
 
 export function getBaseProjectFiles(componentLib: ComponentLib = 'ElementUI'): ProjectFile[] {
+  const adapter = getLibAdapter(componentLib)
+  const packageJson = buildPackageJson(adapter.getDependencies())
+
   return [
     {
       id: 'main-ts',
@@ -84,7 +87,7 @@ export function getBaseProjectFiles(componentLib: ComponentLib = 'ElementUI'): P
       path: '/package.json',
       type: 'file',
       language: 'json',
-      content: PACKAGE_JSON,
+      content: packageJson,
       readonly: true,
     },
     {
@@ -131,6 +134,9 @@ export function buildProjectFiles(
   extraComponents: ProjectFile[] = [],
   componentLib: ComponentLib = 'ElementUI'
 ): ProjectFile[] {
+  const adapter = getLibAdapter(componentLib)
+  const baseFiles = getBaseProjectFiles(componentLib)
+
   const mainPageFile: ProjectFile = {
     id: 'main-page',
     name: 'MainPage.vue',
@@ -140,34 +146,16 @@ export function buildProjectFiles(
     content: mainPageContent,
   }
 
-  const baseFiles = getBaseProjectFiles(componentLib)
-  const adapter = getLibAdapter(componentLib)
-
-  const srcChildren: ProjectFile[] = [
-    baseFiles[0],
-    baseFiles[1],
-    baseFiles[2],
-    baseFiles[3],
-    mainPageFile,
-    ...extraComponents,
-    ...adapter.getExtraSrcChildren(),
-  ]
+  const srcFiles = baseFiles.filter(f => f.path.startsWith('/src/'))
+  const rootFiles = baseFiles.filter(f => !f.path.startsWith('/src/'))
 
   const srcFolder: ProjectFile = {
     id: 'src-folder',
     name: 'src',
     path: '/src',
     type: 'folder',
-    children: srcChildren,
+    children: [...srcFiles, mainPageFile, ...extraComponents, ...adapter.getExtraSrcChildren()],
   }
 
-  return [
-    srcFolder,
-    baseFiles[4],
-    baseFiles[5],
-    baseFiles[6],
-    baseFiles[7],
-    baseFiles[8],
-    baseFiles[9],
-  ]
+  return [srcFolder, ...rootFiles]
 }

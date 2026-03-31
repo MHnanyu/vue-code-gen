@@ -3,6 +3,7 @@ import type { ComponentLib, ProjectFile } from '@/types'
 export interface LibAdapter {
   getMainTs(): string
   getExtraSrcChildren(): ProjectFile[]
+  getDependencies(): Record<string, string>
 }
 
 const adapterMap = new Map<ComponentLib, LibAdapter>()

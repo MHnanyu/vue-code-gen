@@ -30,28 +30,27 @@ export const INDEX_HTML = `<!DOCTYPE html>
 </html>
 `
 
-export const PACKAGE_JSON = JSON.stringify({
-  name: 'vue-generated-app',
-  version: '0.1.0',
-  scripts: {
-    dev: 'vite',
-    build: 'vue-tsc && vite build',
-    preview: 'vite preview'
-  },
-  dependencies: {
-    vue: '^3.5.0',
-    'element-plus': '^2.9.0'
-  },
-  devDependencies: {
-    '@vitejs/plugin-vue': '^6.0.0',
-    tailwindcss: '^3.4.0',
-    autoprefixer: '^10.4.0',
-    postcss: '^8.4.0',
-    typescript: '^5.9.0',
-    vite: '^7.0.0',
-    'vue-tsc': '^3.0.0'
-  }
-}, null, 2)
+export function buildPackageJson(dependencies: Record<string, string>): string {
+  return JSON.stringify({
+    name: 'vue-generated-app',
+    version: '0.1.0',
+    scripts: {
+      dev: 'vite',
+      build: 'vue-tsc && vite build',
+      preview: 'vite preview'
+    },
+    dependencies,
+    devDependencies: {
+      '@vitejs/plugin-vue': '^6.0.0',
+      tailwindcss: '^3.4.0',
+      autoprefixer: '^10.4.0',
+      postcss: '^8.4.0',
+      typescript: '^5.9.0',
+      vite: '^7.0.0',
+      'vue-tsc': '^3.0.0'
+    }
+  }, null, 2)
+}
 
 export const VITE_CONFIG_TS = `import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'

@@ -30,6 +30,12 @@ app.mount('#app')
   getExtraSrcChildren() {
     return getCcuiComponentsAsProjectFiles()
   },
+  getDependencies() {
+    return {
+      vue: '^3.5.0',
+      'element-plus': '^2.9.0',
+    }
+  },
 }
 
 registerLib('ccui', ccuiAdapter)

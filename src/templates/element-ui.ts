@@ -17,6 +17,12 @@ app.mount('#app')
   getExtraSrcChildren() {
     return []
   },
+  getDependencies() {
+    return {
+      vue: '^3.5.0',
+      'element-plus': '^2.9.0',
+    }
+  },
 }
 
 registerLib('ElementUI', elementUIAdapter)
