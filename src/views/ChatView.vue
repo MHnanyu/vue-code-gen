@@ -6,7 +6,7 @@
   >
     <div
       class="bg-white rounded-lg overflow-hidden shadow-sm transition-all duration-300 flex-shrink-0"
-      :style="{ width: isHistoryCollapsed ? '0px' : '260px', padding: isHistoryCollapsed ? '0' : '', opacity: isHistoryCollapsed ? '0' : '1' }"
+      :style="historyPanelStyle"
     >
       <HistoryPanel @new-chat="handleNewChat" @toggle="toggleHistory" :collapsed="isHistoryCollapsed" />
     </div>
@@ -43,7 +43,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import { useProjectStore } from '@/stores/project'
@@ -61,6 +61,12 @@ const isHistoryCollapsed = ref(false)
 const chatPanelWidth = ref(450)
 const isResizing = ref(false)
 const isReady = ref(false)
+
+const historyPanelStyle = computed(() =>
+  isHistoryCollapsed.value
+    ? { width: '0px', padding: '0', opacity: '0' }
+    : { width: '260px', padding: '', opacity: '1' },
+)
 let startX = 0
 let startWidth = 0
 

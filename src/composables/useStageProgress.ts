@@ -26,12 +26,15 @@ export function stagesToProgressStates(
       }
       return { stage: index, stageName: name, status: 'pending', duration: null }
     }
-    const status: StageProgressState['status'] =
-      s.status === 'success' ? 'success' :
-      s.status === 'cached' ? 'cached' :
-      s.status === 'skipped' ? 'skipped' :
-      s.status === 'error' || s.status === 'failed' ? 'failed' :
-      s.status === 'cancelled' ? 'cancelled' : 'pending'
+    const STATUS_MAP: Record<string, StageProgressState['status']> = {
+      success: 'success',
+      cached: 'cached',
+      skipped: 'skipped',
+      error: 'failed',
+      failed: 'failed',
+      cancelled: 'cancelled',
+    }
+    const status: StageProgressState['status'] = STATUS_MAP[s.status] || 'pending'
     return {
       stage: index,
       stageName: name,

@@ -47,7 +47,7 @@
                 v-for="item in lastAssistantStageSummary(session)"
                 :key="item.name"
                 size="small"
-                :type="item.status === 'success' || item.status === 'cached' ? 'success' : item.status === 'failed' ? 'danger' : item.status === 'skipped' ? 'warning' : 'info'"
+                :type="stageStatusType(item.status)"
               >
                 {{ STAGE_NAME_MAP[item.name] || item.name }}
               </el-tag>
@@ -87,6 +87,17 @@ const chatStore = useChatStore()
 
 const sortedSessions = computed(() => chatStore.sortedSessions)
 const currentSessionId = computed(() => chatStore.currentSessionId)
+
+const STAGE_STATUS_TYPE_MAP: Record<string, string> = {
+  success: 'success',
+  cached: 'success',
+  failed: 'danger',
+  skipped: 'warning',
+}
+
+function stageStatusType(status: string): string {
+  return STAGE_STATUS_TYPE_MAP[status] || 'info'
+}
 
 function lastAssistantStageSummary(session: ChatSession) {
   const lastAssistant = [...(session.messages || [])]
