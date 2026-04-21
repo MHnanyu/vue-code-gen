@@ -36,6 +36,24 @@ export interface ChatMessage {
   failedStep?: number | null
   stages?: Stages | null
   stepMessages?: StepMessage[] | null
+  agentMetadata?: AgentMessageMetadata
+}
+
+export interface AgentMessageMetadata {
+  thinkingContent: string
+  toolCalls: {
+    toolName: string
+    label: string
+    status: 'calling' | 'completed' | 'failed'
+    step: number
+    outputUrl: string | null
+  }[]
+  files?: {
+    name: string
+    path: string
+    lines: number
+    sizeBytes: number
+  }[]
 }
 
 export interface StageStartEvent {
@@ -93,6 +111,74 @@ export interface StageProgressState {
   status: 'pending' | 'running' | 'success' | 'failed' | 'skipped' | 'cached' | 'cancelled'
   duration: number | null
   progressMessage?: string
+}
+
+export interface AgentThinkingEvent {
+  content: string
+  step: number
+  timestamp: string
+}
+
+export interface AgentToolCallStartEvent {
+  toolName: string
+  arguments: string
+  step: number
+  timestamp: string
+}
+
+export interface AgentToolCallResultEvent {
+  toolName: string
+  result: Record<string, any>
+  step: number
+  outputUrl: string | null
+  timestamp: string
+}
+
+export interface AgentDoneEvent {
+  files: AgentFileSummary[] | null
+  timestamp: string
+}
+
+export interface AgentFileSummary {
+  name: string
+  path: string
+  lines: number
+  size_bytes: number
+}
+
+export interface AgentFilesEvent {
+  files: AgentFileItem[]
+  timestamp: string
+}
+
+export interface AgentFileItem {
+  name: string
+  path: string
+  downloadUrl: string
+  lines: number
+  sizeBytes: number
+}
+
+export interface AgentCancelledEvent {
+  cancelledAtStep: number
+  timestamp: string
+}
+
+export interface AgentErrorEvent {
+  code: number
+  message: string
+  failedStep: number | null
+  stages: Record<string, any>
+  timestamp: string
+}
+
+export interface AgentToolCallState {
+  toolName: string
+  status: 'calling' | 'completed' | 'failed'
+  step: number
+  label: string
+  outputUrl: string | null
+  duration?: number
 }
 
 export type ComponentLib = 'ElementUI' | 'aui' | 'ccui'

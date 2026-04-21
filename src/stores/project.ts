@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { ProjectFile } from '@/types'
+import type { ProjectFile, ComponentLib } from '@/types'
+import { apiFilesToProjectFiles } from '@/utils/files'
 
 export const useProjectStore = defineStore('project', () => {
   const files = ref<ProjectFile[]>([])
@@ -39,6 +40,11 @@ export const useProjectStore = defineStore('project', () => {
       const firstFile = findFirstFile(newFiles)
       if (firstFile) selectedFileId.value = firstFile.id
     }
+  }
+
+  function setFilesFromApiFiles(apiFiles: any[], componentLib?: ComponentLib) {
+    const projectFiles = apiFilesToProjectFiles(apiFiles, componentLib)
+    setFiles(projectFiles)
   }
 
   function findFirstFile(files: ProjectFile[]): ProjectFile | null {
@@ -137,6 +143,7 @@ export const useProjectStore = defineStore('project', () => {
     selectedFile,
     editableFiles,
     setFiles,
+    setFilesFromApiFiles,
     selectFile,
     updateFileContent,
     clearProject,

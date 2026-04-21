@@ -7,7 +7,6 @@ interface ApiResponse<T> {
   data: T
   message?: string
 }
-
 interface ApiFile {
   id: string
   name: string
@@ -110,6 +109,14 @@ interface GenerateIterateRequest {
   sessionId: string
   files: ApiFile[]
   fromStep?: number | null
+}
+
+interface GenerateAgentRequest {
+  prompt: string
+  sessionId: string
+  componentLib?: ComponentLib
+  attachments?: Attachment[]
+  debug?: boolean
 }
 
 export async function getSessions(page = 1, pageSize = 20): Promise<SessionListResponse> {
@@ -221,9 +228,9 @@ export async function uploadFiles(files: File[]): Promise<UploadResponse> {
   return result.data
 }
 
-import { fetchSSEStream, type SSECallbacks } from './sse'
+import { fetchSSEStream, fetchAgentSSEStream, type SSECallbacks, type AgentSSECallbacks } from './sse'
 
-export type { SSECallbacks }
+export type { SSECallbacks, AgentSSECallbacks }
 
 export function generateInitialStream(
   params: GenerateInitialRequest,
@@ -247,12 +254,24 @@ export function generateIterateStream(
   )
 }
 
+export function generateAgentStream(
+  params: GenerateAgentRequest,
+  callbacks: AgentSSECallbacks,
+): Promise<void> {
+  return fetchAgentSSEStream(
+    '/api/generate/agent/stream',
+    params as unknown as Record<string, unknown>,
+    callbacks,
+  )
+}
+
 export async function cancelGeneration(taskId: string): Promise<void> {
   await fetch(`${API_BASE}/api/generate/cancel?taskId=${taskId}`, { method: 'POST' })
 }
 
 export async function fetchStageFile(filePath: string): Promise<string> {
-  const response = await fetch(`${API_BASE}/${filePath}`)
+  const url = filePath.startsWith('/') ? `${API_BASE}${filePath}` : `${API_BASE}/${filePath}`
+  const response = await fetch(url)
   if (!response.ok) {
     throw new Error(`Failed to fetch stage file: ${response.status}`)
   }
@@ -260,7 +279,8 @@ export async function fetchStageFile(filePath: string): Promise<string> {
 }
 
 export async function fetchStageJson<T = unknown>(filePath: string): Promise<T> {
-  const response = await fetch(`${API_BASE}/${filePath}`)
+  const url = filePath.startsWith('/') ? `${API_BASE}${filePath}` : `${API_BASE}/${filePath}`
+  const response = await fetch(url)
   if (!response.ok) {
     throw new Error(`Failed to fetch stage JSON: ${response.status}`)
   }

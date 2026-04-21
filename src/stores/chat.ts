@@ -12,6 +12,7 @@ import {
   transformApiSession,
 } from '@/api'
 import { useChatStageState } from '@/composables/useChatStageState'
+import { useAgentState } from '@/composables/useAgentState'
 
 export const useChatStore = defineStore('chat', () => {
   const {
@@ -33,6 +34,8 @@ export const useChatStore = defineStore('chat', () => {
     invalidateStageCache,
     clearRetryInvalidatedStageNames,
   } = useChatStageState()
+
+  const agentState = useAgentState()
 
   const sessions = ref<ChatSession[]>([])
   const currentSessionId = ref<string | null>(null)
@@ -239,5 +242,6 @@ export const useChatStore = defineStore('chat', () => {
     setActiveStageTab,
     invalidateStageCache,
     clearRetryInvalidatedStageNames,
+    agentState,
   }
 })
