@@ -71,7 +71,6 @@
 
       <StageOutputPanel
         v-show="activeTab === 'stages'"
-        @has-stage-content-change="onHasStageContentChange"
       />
     </template>
   </div>
@@ -100,13 +99,11 @@ const projectStore = useProjectStore()
 const chatStore = useChatStore()
 const activeTab = ref('preview')
 const isSaving = ref(false)
-const hasStageContent = ref(false)
+const hasStageContent = computed(() => {
+  return chatStore.isStreaming || chatStore.hasStepMessages
+})
 const replPreviewRef = ref<InstanceType<typeof VueReplPreview> | null>(null)
 const hasFiles = computed(() => projectStore.files.length > 0)
-
-function onHasStageContentChange(val: boolean) {
-  hasStageContent.value = val
-}
 
 const componentLibLabel = computed(() => {
   const session = chatStore.currentSession
