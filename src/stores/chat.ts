@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import type { ChatMessage, ChatSession, ComponentLib } from '@/types'
+import type { ChatMessage, ChatSession, ComponentLib, SessionMode } from '@/types'
 import type { Attachment } from '@/api'
 import {
   getSessions as apiGetSessions,
@@ -56,9 +56,9 @@ export const useChatStore = defineStore('chat', () => {
     )
   })
 
-  async function createSessionRemote(title: string, componentLib?: ComponentLib): Promise<string | null> {
+  async function createSessionRemote(title: string, componentLib?: ComponentLib, mode?: SessionMode): Promise<string | null> {
     try {
-      const apiSession = await apiCreateSession(title, componentLib)
+      const apiSession = await apiCreateSession(title, componentLib, mode)
       const session = transformApiSession(apiSession)
       sessions.value.unshift(session)
       currentSessionId.value = session.id

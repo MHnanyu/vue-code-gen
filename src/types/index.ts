@@ -97,6 +97,8 @@ export interface StageProgressState {
 
 export type ComponentLib = 'ElementUI' | 'aui' | 'ccui'
 
+export type SessionMode = 'pipeline' | 'agent'
+
 // 对话会话类型
 export interface ChatSession {
   id: string
@@ -104,6 +106,7 @@ export interface ChatSession {
   messages: ChatMessage[]
   files?: ApiFile[]
   componentLib?: ComponentLib
+  mode?: SessionMode
   createdAt: Date
   updatedAt: Date
 }

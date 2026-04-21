@@ -112,6 +112,10 @@
           </div>
 
           <div class="flex items-center gap-3">
+            <el-select v-model="selectedMode" placeholder="模式" style="width: 120px">
+              <el-option label="Pipeline" value="pipeline" />
+              <el-option label="Agent" value="agent" />
+            </el-select>
             <el-select v-model="selectedLib" placeholder="组件库" style="width: 140px">
               <el-option label="ElementUI" value="ElementUI" />
               <el-option label="AUI" value="aui" />
@@ -133,7 +137,7 @@ import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useChatStore } from '@/stores/chat'
 import { uploadFiles as apiUploadFiles, type Attachment } from '@/api'
-import type { ComponentLib } from '@/types'
+import type { ComponentLib, SessionMode } from '@/types'
 import type { UploadFile, UploadUserFile } from 'element-plus'
 import { Document, Close } from '@element-plus/icons-vue'
 
@@ -142,6 +146,7 @@ const chatStore = useChatStore()
 
 const prompt = ref('')
 const selectedLib = ref('')
+const selectedMode = ref<SessionMode>('pipeline')
 const loading = ref(false)
 const imageList = ref<UploadUserFile[]>([])
 const attachList = ref<UploadUserFile[]>([])
@@ -337,7 +342,8 @@ async function handleGenerate() {
 
     const sessionId = await chatStore.createSessionRemote(
       prompt.value.slice(0, 30) || `基于${attachments.length}个文件生成`,
-      (selectedLib.value || 'ElementUI') as ComponentLib
+      (selectedLib.value || 'ElementUI') as ComponentLib,
+      selectedMode.value
     )
     if (sessionId) {
       router.push({ path: '/workspace', query: { session_id: sessionId } })

@@ -12,6 +12,14 @@
           <el-icon><DArrowRight /></el-icon>
         </el-button>
         <h3 class="m-0 text-base text-gray-800">AI 对话</h3>
+        <el-tag
+          v-if="currentSession?.mode"
+          size="small"
+          :type="currentSession.mode === 'agent' ? 'warning' : 'success'"
+          effect="plain"
+        >
+          {{ currentSession.mode === 'agent' ? 'Agent' : 'Pipeline' }}
+        </el-tag>
       </div>
       <el-tag v-if="currentSession" size="small" type="info">
         {{ currentSession.messages.length }} 条消息
