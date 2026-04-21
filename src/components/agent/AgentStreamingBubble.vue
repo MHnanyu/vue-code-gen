@@ -26,6 +26,10 @@
           <el-icon><CircleCheck /></el-icon>
           <span class="ml-2">生成完成，正在加载代码...</span>
         </div>
+
+        <div v-if="errorMessage" class="px-4 py-3 rounded-xl bg-red-50 inline-flex items-center text-red-600">
+          <span>{{ errorMessage }}</span>
+        </div>
       </div>
     </div>
 
@@ -38,6 +42,17 @@
         @click="cancelFn"
       >
         取消生成
+      </el-button>
+    </div>
+
+    <div v-if="errorMessage" class="ml-11 mt-2">
+      <el-button
+        size="small"
+        type="primary"
+        text
+        @click="emit('retry')"
+      >
+        重新生成
       </el-button>
     </div>
   </div>
@@ -60,5 +75,6 @@ defineProps<{
 
 const emit = defineEmits<{
   'view-output': [url: string]
+  'retry': []
 }>()
 </script>

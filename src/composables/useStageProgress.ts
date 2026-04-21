@@ -3,12 +3,59 @@ import { INITIAL_STAGE_KEYS } from '@/constants/stages'
 import type { ChatMessage, StageProgressState, StepMessage } from '@/types'
 import { useChatStore } from '@/stores/chat'
 
+const STATUS_MAP: Record<string, StageProgressState['status']> = {
+  success: 'success',
+  cached: 'cached',
+  skipped: 'skipped',
+  error: 'failed',
+  failed: 'failed',
+  cancelled: 'cancelled',
+}
+
+function buildProgressState(
+  stageName: string,
+  stageIndex: number,
+  stageInfo: any,
+  progressMessage?: string,
+): StageProgressState {
+  if (!stageInfo) {
+    return { stage: stageIndex, stageName, status: 'pending', duration: null }
+  }
+  const status: StageProgressState['status'] = STATUS_MAP[stageInfo.status] || 'pending'
+  return {
+    stage: stageIndex,
+    stageName,
+    status,
+    duration: stageInfo.duration ?? null,
+    progressMessage: stageInfo.error || progressMessage || undefined,
+  }
+}
+
 export function stagesToProgressStates(
   stages: any,
   stepMessages?: any[] | null,
   failedStep?: number | null,
 ): StageProgressState[] {
   const hasInitial = INITIAL_STAGE_KEYS.some(k => stages?.[k])
+
+  if (!hasInitial && stepMessages && stepMessages.length > 0) {
+    const stepMsgMap = new Map<string, string>()
+    for (const sm of stepMessages) {
+      if (sm.stageName && sm.message) {
+        stepMsgMap.set(sm.stageName, sm.message)
+      }
+    }
+
+    return stepMessages.map((sm, index) =>
+      buildProgressState(
+        sm.stageName,
+        sm.stage ?? index,
+        stages?.[sm.stageName],
+        stepMsgMap.get(sm.stageName),
+      ),
+    )
+  }
+
   const keys = hasInitial ? INITIAL_STAGE_KEYS : ['iteration']
   const stepMsgMap = new Map<string, string>()
   if (stepMessages) {
@@ -22,26 +69,11 @@ export function stagesToProgressStates(
     const s = stages?.[name]
     if (!s) {
       if (failedStep != null && index >= failedStep) {
-        return { stage: index, stageName: name, status: 'cancelled', duration: null }
+        return { stage: index, stageName: name, status: 'cancelled' as const, duration: null }
       }
-      return { stage: index, stageName: name, status: 'pending', duration: null }
+      return { stage: index, stageName: name, status: 'pending' as const, duration: null }
     }
-    const STATUS_MAP: Record<string, StageProgressState['status']> = {
-      success: 'success',
-      cached: 'cached',
-      skipped: 'skipped',
-      error: 'failed',
-      failed: 'failed',
-      cancelled: 'cancelled',
-    }
-    const status: StageProgressState['status'] = STATUS_MAP[s.status] || 'pending'
-    return {
-      stage: index,
-      stageName: name,
-      status,
-      duration: s.duration ?? null,
-      progressMessage: s.error || stepMsgMap.get(name) || undefined,
-    }
+    return buildProgressState(name, index, s, stepMsgMap.get(name))
   })
 }
 

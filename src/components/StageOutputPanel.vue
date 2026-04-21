@@ -368,8 +368,9 @@ watch(() => chatStore.currentSessionId, () => {
 })
 
 function getStageOutputType(stageName: string): 'markdown' | 'vue' | null {
-  if (stageName === 'attachment' || stageName === 'requirement') return 'markdown'
-  if (stageName === 'generation' || stageName === 'optimization' || stageName === 'iteration') return 'vue'
+  if (stageName === 'attachment' || stageName === 'requirement' || stageName === 'normalize_requirement') return 'markdown'
+  if (stageName === 'generation' || stageName === 'optimization' || stageName === 'iteration'
+    || stageName === 'generate_vue_code' || stageName === 'optimize_ux') return 'vue'
   return null
 }
 

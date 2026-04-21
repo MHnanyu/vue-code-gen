@@ -19,7 +19,7 @@ export interface Stages {
 export interface StepMessage {
   stage: number
   stageName: string
-  message: string
+  message?: string
   status: 'success' | 'skipped' | 'failed' | 'cached'
   duration: number | null
   outputType?: 'markdown' | 'json' | 'vue' | null
@@ -116,6 +116,7 @@ export interface StageProgressState {
 export interface AgentThinkingEvent {
   content: string
   step: number
+  taskId: string
   timestamp: string
 }
 

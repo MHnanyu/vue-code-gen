@@ -20,6 +20,9 @@ export function useAgentGeneration(scrollToBottom: () => void) {
   function buildCallbacks(sessionId: string): AgentSSECallbacks {
     return {
       onAgentThinking(event) {
+        if (!agentState.currentTaskId) {
+          agentState.currentTaskId = event.taskId
+        }
         agentState.appendThinking(event.content)
         scrollToBottom()
       },
@@ -69,7 +72,7 @@ export function useAgentGeneration(scrollToBottom: () => void) {
           projectStore.setFilesFromApiFiles(sessionFiles, chatStore.currentSession?.componentLib)
         }
 
-        const content = `生成完成，共 ${event.files.length} 个文件`
+        const content = 'Agent 模式生成完成'
         chatStore.addMessageLocal(sessionId, {
           role: 'assistant',
           content,
@@ -103,7 +106,7 @@ export function useAgentGeneration(scrollToBottom: () => void) {
 
         chatStore.addMessageLocal(sessionId, {
           role: 'assistant',
-          content: '已取消生成',
+          content: '用户取消了生成',
           agentMetadata: {
             thinkingContent: agentState.thinkingContent,
             toolCalls: agentState.toolCalls.map(tc => ({
@@ -129,7 +132,7 @@ export function useAgentGeneration(scrollToBottom: () => void) {
 
         chatStore.addMessageLocal(sessionId, {
           role: 'assistant',
-          content: event.message,
+          content: `Agent 执行异常: ${event.message}`,
           agentMetadata: {
             thinkingContent: agentState.thinkingContent,
             toolCalls: agentState.toolCalls.map(tc => ({
@@ -185,6 +188,56 @@ export function useAgentGeneration(scrollToBottom: () => void) {
     }
   }
 
+  async function retryAgentGeneration(fromStep = 0) {
+    const sessionId = chatStore.currentSessionId
+    const session = chatStore.currentSession
+    if (!sessionId || !session || agentState.isStreaming) return
+
+    agentState.isRetrying = true
+
+    chatStore.removeLastAssistantMessage(sessionId, true)
+
+    const lastUserMessage = [...session.messages].reverse().find(m => m.role === 'user')
+    if (!lastUserMessage) {
+      agentState.isRetrying = false
+      return
+    }
+
+    agentState.reset()
+    agentState.isStreaming = true
+    chatStore.setLoading(true)
+
+    const callbacks = buildCallbacks(sessionId)
+    postStreamReloadNeeded.value = false
+
+    try {
+      await generateAgentStream(
+        {
+          prompt: lastUserMessage.content,
+          sessionId,
+          componentLib: chatStore.currentSession?.componentLib,
+          fromStep,
+        },
+        callbacks,
+      )
+    } catch (error) {
+      agentState.isStreaming = false
+      agentState.currentTaskId = null
+      chatStore.setLoading(false)
+      postStreamReloadNeeded.value = true
+      ElMessage.error('生成失败: ' + (error as Error).message)
+    } finally {
+      if (postStreamReloadNeeded.value && chatStore.currentSessionId) {
+        await chatStore.loadSession(chatStore.currentSessionId)
+      }
+      chatStore.setLoading(false)
+      agentState.isStreaming = false
+      agentState.isRetrying = false
+      pendingUserMessage.value = ''
+      scrollToBottom()
+    }
+  }
+
   async function sendMessage() {
     const message = inputMessage.value.trim()
     if (!message || isLoading.value || agentState.isStreaming) return
@@ -221,6 +274,7 @@ export function useAgentGeneration(scrollToBottom: () => void) {
     currentAttachments,
     isLoading,
     sendMessage,
+    retryAgentGeneration,
     agentState,
   }
 }

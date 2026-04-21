@@ -117,6 +117,7 @@ interface GenerateAgentRequest {
   componentLib?: ComponentLib
   attachments?: Attachment[]
   debug?: boolean
+  fromStep?: number
 }
 
 export async function getSessions(page = 1, pageSize = 20): Promise<SessionListResponse> {

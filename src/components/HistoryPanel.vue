@@ -93,6 +93,7 @@ const STAGE_STATUS_TYPE_MAP: Record<string, string> = {
   cached: 'success',
   failed: 'danger',
   skipped: 'warning',
+  cancelled: 'warning',
 }
 
 function stageStatusType(status: string): string {

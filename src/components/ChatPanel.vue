@@ -33,9 +33,10 @@
 
           <template v-else-if="message.role === 'assistant'">
             <AgentMessageBubble
-              v-if="isAgentMode && message.agentMetadata"
+              v-if="isAgentMode && (message.agentMetadata || message.content === '正在生成中...' || message.content === 'Agent 模式生成完成' || message.content.startsWith('Agent 执行异常') || message.content === '用户取消了生成')"
               :message="message"
               @view-output="handleViewOutput"
+              @retry="agent.retryAgentGeneration()"
             />
             <AssistantMessageBubble
               v-else
@@ -63,6 +64,7 @@
             :error-message="agentState.errorMessage"
             :cancel-fn="agentState.cancelStreaming"
             @view-output="handleViewOutput"
+            @retry="agent.retryAgentGeneration()"
           />
         </template>
         <template v-else>
@@ -102,6 +104,7 @@
             :error-message="agentState.errorMessage"
             :cancel-fn="agentState.cancelStreaming"
             @view-output="handleViewOutput"
+            @retry="agent.retryAgentGeneration()"
           />
         </template>
         <template v-else>
