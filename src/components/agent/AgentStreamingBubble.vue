@@ -12,7 +12,8 @@
             :tool-name="tc.toolName"
             :label="tc.label"
             :status="tc.status"
-            :output-url="tc.outputUrl"
+            :output-urls="tc.outputUrls"
+            :output-type="tc.outputType"
             @view-output="(url: string) => emit('view-output', url)"
           />
         </template>

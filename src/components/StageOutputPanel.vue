@@ -159,6 +159,8 @@ async function ensureStageContentLoaded(key: string) {
   if (!stageName) return
 
   let fetchPath: string | null = null
+  let filePaths: string[] = []
+  let fileCategory: 'file' | 'files' | null = null
 
   const isDeduplicatedKey = /_\d+$/.test(key)
 
@@ -170,23 +172,27 @@ async function ensureStageContentLoaded(key: string) {
       const sameNameOutputs = outputs.filter(o => o.stageName === stageName)
       const output = sameNameOutputs[idx]
       if (output) {
-        fetchPath = output.filePath || null
+        filePaths = output.filePath || []
+        fileCategory = output.fileCategory || null
       }
     } else {
       const output = [...outputs].reverse().find(o => o.stageName === stageName)
       if (output) {
-        fetchPath = output.filePath || null
+        filePaths = output.filePath || []
+        fileCategory = output.fileCategory || null
       }
     }
   }
 
-  if (!fetchPath) {
+  if (filePaths.length === 0) {
     fetchPath = chatStore.stagePreviewMap.get(stageName) ?? null
   }
 
-  if (!fetchPath) return
+  if (filePaths.length === 0 && !fetchPath) return
 
-  const outputType = getStageOutputType(stageName)
+  const outputType = fileCategory === 'file' ? 'markdown'
+    : fileCategory === 'files' ? 'vue'
+    : getStageOutputType(stageName)
   if (!outputType) return
 
   const wasStreaming = chatStore.isStreaming
@@ -194,7 +200,8 @@ async function ensureStageContentLoaded(key: string) {
   stageLoadingMap.value.set(key, true)
   try {
     if (outputType === 'markdown') {
-      const content = await fetchStageFile(fetchPath)
+      const mdPath = filePaths.length > 0 ? filePaths[0] : fetchPath!
+      const content = await fetchStageFile(mdPath)
       const stillValid = completedStages.value.some(s => s._key === key)
       if (stillValid) {
         stageContentCache.value.set(key, { type: 'markdown', content, files: null })
@@ -209,8 +216,29 @@ async function ensureStageContentLoaded(key: string) {
         }
       }
     } else if (outputType === 'vue') {
-      const raw = await fetchStageJson<ApiFile[] | { data?: ApiFile[]; files?: ApiFile[] }>(fetchPath)
-      const data = Array.isArray(raw) ? raw : (raw.data || raw.files || [])
+      let data: ApiFile[] = []
+      if (filePaths.length > 0) {
+        const fetchResults = await Promise.allSettled(
+          filePaths.map(async (fp) => {
+            const code = await fetchStageFile(fp)
+            const fileName = fp.split('/').pop() || 'Unknown.vue'
+            return {
+              id: `step_${fp}`,
+              name: fileName,
+              path: fp,
+              type: 'file' as const,
+              language: 'vue' as const,
+              content: code,
+            } as ApiFile
+          }),
+        )
+        data = fetchResults
+          .filter((r): r is PromiseFulfilledResult<ApiFile> => r.status === 'fulfilled')
+          .map(r => r.value)
+      } else if (fetchPath) {
+        const raw = await fetchStageJson<ApiFile[] | { data?: ApiFile[]; files?: ApiFile[] }>(fetchPath)
+        data = Array.isArray(raw) ? raw : (raw.data || raw.files || [])
+      }
       const stillValid = completedStages.value.some(s => s._key === key)
       if (stillValid) {
         stageContentCache.value.set(key, { type: 'vue', content: null, files: data })

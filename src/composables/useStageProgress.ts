@@ -88,14 +88,26 @@ export function buildFallbackStepMessages(
 ): StepMessage[] {
   return progresses
     .filter(s => s.status !== 'pending')
-    .map(s => ({
-      stage: s.stage,
-      stageName: s.stageName,
-      message: s.progressMessage || '',
-      status: s.status as StepMessage['status'],
-      duration: s.duration,
-      filePath: previewMap.get(s.stageName) || null,
-    }))
+    .map(s => {
+      const previewPath = previewMap.get(s.stageName)
+      const filePaths = previewPath ? [previewPath] : null
+      let fileCategory: 'file' | 'files' | null = null
+      if (s.stageName === 'attachment' || s.stageName === 'requirement' || s.stageName === 'normalize_requirement') {
+        fileCategory = 'file'
+      } else if (s.stageName === 'generation' || s.stageName === 'optimization' || s.stageName === 'iteration'
+        || s.stageName === 'generate_vue_code' || s.stageName === 'optimize_ux') {
+        fileCategory = 'files'
+      }
+      return {
+        stage: s.stage,
+        stageName: s.stageName,
+        message: s.progressMessage || '',
+        status: s.status as StepMessage['status'],
+        duration: s.duration,
+        filePath: filePaths,
+        fileCategory,
+      }
+    })
 }
 
 export function useStageProgress() {

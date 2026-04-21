@@ -25,21 +25,25 @@ export function useAgentState() {
     thinkingContent.value += text
   }
 
-  function addToolCall(toolName: string, step: number): void {
+  function addToolCall(toolName: string, step: number, arguments_?: string): void {
     toolCalls.value.push({
       toolName,
       status: 'calling',
       step,
       label: AGENT_TOOL_LABELS[toolName] || toolName,
-      outputUrl: null,
+      outputUrls: [],
+      outputType: null,
+      arguments: arguments_,
     })
   }
 
-  function completeToolCall(toolName: string, outputUrl: string | null): void {
+  function completeToolCall(toolName: string, outputUrls: string[], outputType: 'file' | 'files' | null, result?: Record<string, any>): void {
     const tc = toolCalls.value.find(t => t.toolName === toolName && t.status === 'calling')
     if (tc) {
       tc.status = 'completed'
-      tc.outputUrl = outputUrl
+      tc.outputUrls = outputUrls
+      tc.outputType = outputType
+      if (result) tc.result = result
     }
   }
 

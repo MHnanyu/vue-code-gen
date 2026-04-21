@@ -28,15 +28,15 @@ export function useAgentGeneration(scrollToBottom: () => void) {
       },
 
       onToolCallStart(event) {
-        agentState.addToolCall(event.toolName, event.step)
+        agentState.addToolCall(event.toolName, event.step, event.arguments)
         scrollToBottom()
       },
 
       async onToolCallResult(event) {
-        if (event.outputUrl && AGENT_OUTPUT_URL_TOOLS.has(event.toolName)) {
-          agentState.completeToolCall(event.toolName, event.outputUrl)
+        if (event.outputUrls && event.outputUrls.length > 0 && AGENT_OUTPUT_URL_TOOLS.has(event.toolName)) {
+          agentState.completeToolCall(event.toolName, event.outputUrls, event.outputType, event.result)
         } else {
-          agentState.completeToolCall(event.toolName, null)
+          agentState.completeToolCall(event.toolName, [], null, event.result)
         }
         scrollToBottom()
       },
@@ -83,7 +83,10 @@ export function useAgentGeneration(scrollToBottom: () => void) {
               label: tc.label,
               status: tc.status,
               step: tc.step,
-              outputUrl: tc.outputUrl,
+              outputUrls: tc.outputUrls,
+              outputType: tc.outputType,
+              arguments: tc.arguments,
+              result: tc.result,
             })),
             files: event.files.map((f: AgentFileItem) => ({
               name: f.name,
@@ -114,12 +117,14 @@ export function useAgentGeneration(scrollToBottom: () => void) {
               label: tc.label,
               status: tc.status,
               step: tc.step,
-              outputUrl: tc.outputUrl,
+              outputUrls: tc.outputUrls,
+              outputType: tc.outputType,
+              arguments: tc.arguments,
+              result: tc.result,
             })),
           },
         })
 
-        postStreamReloadNeeded.value = true
         ElMessage.info('已取消生成')
         scrollToBottom()
       },
@@ -140,12 +145,14 @@ export function useAgentGeneration(scrollToBottom: () => void) {
               label: tc.label,
               status: tc.status,
               step: tc.step,
-              outputUrl: tc.outputUrl,
+              outputUrls: tc.outputUrls,
+              outputType: tc.outputType,
+              arguments: tc.arguments,
+              result: tc.result,
             })),
           },
         })
 
-        postStreamReloadNeeded.value = true
         ElMessage.error(`生成失败：${event.message}`)
         scrollToBottom()
       },

@@ -13,7 +13,8 @@
           :tool-name="tc.toolName"
           :label="tc.label"
           :status="tc.status"
-          :output-url="tc.outputUrl"
+          :output-urls="tc.outputUrls"
+          :output-type="tc.outputType"
           @view-output="(url: string) => emit('view-output', url)"
         />
       </template>
@@ -29,13 +30,25 @@
           <el-icon v-else-if="sm.status === 'failed'" class="text-red-500"><CircleClose /></el-icon>
           <span>{{ sm.stageName }}</span>
           <span v-if="sm.duration" class="text-gray-400">{{ (sm.duration / 1000).toFixed(1) }}s</span>
-          <span
-            v-if="sm.filePath"
-            class="text-blue-500 cursor-pointer hover:underline"
-            @click="emit('view-output', sm.filePath)"
-          >
-            查看产物
-          </span>
+          <template v-if="sm.filePath && sm.filePath.length > 0">
+            <span
+              v-if="sm.fileCategory === 'file' || sm.filePath.length === 1"
+              class="text-blue-500 cursor-pointer hover:underline"
+              @click="emit('view-output', sm.filePath![0])"
+            >
+              查看产物
+            </span>
+            <template v-else>
+              <span
+                v-for="(fp, fpIdx) in sm.filePath"
+                :key="fpIdx"
+                class="text-blue-500 cursor-pointer hover:underline"
+                @click="emit('view-output', fp)"
+              >
+                {{ fpIdx === 0 ? '查看产物' : ' / ' }}{{ fpIdx > 0 ? stepFileName(fp) : '' }}
+              </span>
+            </template>
+          </template>
         </div>
       </template>
     </div>
@@ -127,5 +140,9 @@ function stepMessageClass(sm: StepMessage) {
   if (sm.status === 'success') return 'bg-green-50 border-green-200 text-green-700'
   if (sm.status === 'failed') return 'bg-red-50 border-red-200 text-red-700'
   return 'bg-gray-50 border-gray-200 text-gray-600'
+}
+
+function stepFileName(path: string): string {
+  return path.split('/').pop() || path
 }
 </script>

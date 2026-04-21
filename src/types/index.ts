@@ -23,7 +23,8 @@ export interface StepMessage {
   status: 'success' | 'skipped' | 'failed' | 'cached'
   duration: number | null
   outputType?: 'markdown' | 'json' | 'vue' | null
-  filePath?: string | null
+  filePath?: string[] | null
+  fileCategory?: 'file' | 'files' | null
 }
 
 export interface ChatMessage {
@@ -37,6 +38,16 @@ export interface ChatMessage {
   stages?: Stages | null
   stepMessages?: StepMessage[] | null
   agentMetadata?: AgentMessageMetadata
+  toolCalls?: AgentToolCallRecord[]
+}
+
+export interface AgentToolCallRecord {
+  toolName: string
+  arguments: string
+  status: 'success' | 'failed'
+  result: Record<string, any>
+  duration: number
+  timestamp: string
 }
 
 export interface AgentMessageMetadata {
@@ -46,7 +57,10 @@ export interface AgentMessageMetadata {
     label: string
     status: 'calling' | 'completed' | 'failed'
     step: number
-    outputUrl: string | null
+    outputUrls: string[]
+    outputType: 'file' | 'files' | null
+    arguments?: string
+    result?: Record<string, any>
   }[]
   files?: {
     name: string
@@ -131,7 +145,8 @@ export interface AgentToolCallResultEvent {
   toolName: string
   result: Record<string, any>
   step: number
-  outputUrl: string | null
+  outputUrls: string[]
+  outputType: 'file' | 'files'
   timestamp: string
 }
 
@@ -178,7 +193,10 @@ export interface AgentToolCallState {
   status: 'calling' | 'completed' | 'failed'
   step: number
   label: string
-  outputUrl: string | null
+  outputUrls: string[]
+  outputType: 'file' | 'files' | null
+  arguments?: string
+  result?: Record<string, any>
   duration?: number
 }
 

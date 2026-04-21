@@ -1,4 +1,4 @@
-import type { ProjectFile, ComponentLib, SessionMode, Stages, StepMessage } from '@/types'
+import type { ProjectFile, ComponentLib, SessionMode, Stages, StepMessage, AgentToolCallRecord } from '@/types'
 
 export const API_BASE = 'http://localhost:8000'
 
@@ -48,6 +48,7 @@ interface ApiMessage {
   failedStep?: number | null
   stages?: Stages | null
   stepMessages?: StepMessage[] | null
+  toolCalls?: AgentToolCallRecord[]
 }
 
 interface CreateSessionRequest {
@@ -181,6 +182,7 @@ export function transformApiSession(session: ApiSession) {
       failedStep: msg.failedStep,
       stages: msg.stages,
       stepMessages: msg.stepMessages,
+      toolCalls: msg.toolCalls,
     })),
     files: session.files,
     componentLib: session.componentLib,

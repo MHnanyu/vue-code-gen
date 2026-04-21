@@ -8,9 +8,25 @@
       <el-icon v-else-if="status === 'completed'" class="text-green-500"><CircleCheck /></el-icon>
       <el-icon v-else-if="status === 'failed'" class="text-red-500"><CircleClose /></el-icon>
       <span>{{ label }}</span>
-      <span v-if="outputUrl" class="text-xs text-blue-500 cursor-pointer hover:underline" @click="$emit('view-output', outputUrl)">
-        查看产物
-      </span>
+      <template v-if="outputUrls.length > 0">
+        <span
+          v-if="outputType === 'file'"
+          class="text-xs text-blue-500 cursor-pointer hover:underline"
+          @click="$emit('view-output', outputUrls[0])"
+        >
+          查看产物
+        </span>
+        <template v-else-if="outputType === 'files'">
+          <span
+            v-for="(url, idx) in outputUrls"
+            :key="idx"
+            class="text-xs text-blue-500 cursor-pointer hover:underline"
+            @click="$emit('view-output', url)"
+          >
+            {{ idx === 0 ? '查看产物' : ' / ' }}{{ idx > 0 ? fileName(url) : '' }}
+          </span>
+        </template>
+      </template>
     </div>
   </div>
 </template>
@@ -23,12 +39,17 @@ const props = defineProps<{
   toolName: string
   label: string
   status: 'calling' | 'completed' | 'failed'
-  outputUrl: string | null
+  outputUrls: string[]
+  outputType: 'file' | 'files' | null
 }>()
 
 defineEmits<{
   'view-output': [url: string]
 }>()
+
+function fileName(url: string): string {
+  return url.split('/').pop() || url
+}
 
 const statusClass = computed(() => {
   switch (props.status) {
