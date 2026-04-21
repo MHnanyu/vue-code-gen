@@ -1,72 +1,70 @@
 <template>
-  <header class="app-header">
-    <div class="logo" @click="$router.push('/')">
-      <span class="logo-icon">V</span>
-      <span class="logo-text">Vue Code Gen</span>
+  <header :class="isHome ? 'absolute top-0 left-0 right-0 z-20 flex justify-between items-center px-6 py-2 pointer-events-auto' : 'relative z-10 flex justify-between items-center px-6 py-2 bg-white/70 backdrop-blur-xl border-b border-gray-200'">
+    <div class="flex items-center gap-2 cursor-pointer" @click="$router.push('/')">
+      <span class="logo-text">Design AI</span>
     </div>
     
-    <nav class="nav-links">
-      <router-link to="/chat">Chat</router-link>
-      <router-link to="/generator">Code Gen</router-link>
-      <router-link to="/preview">Preview</router-link>
-      <router-link to="/ux-design">UX Design</router-link>
+    <nav class="flex gap-4">
+      <router-link
+        class="font-medium py-1 border-b-2 border-transparent transition-all duration-200 no-underline"
+        :class="isHome ? 'text-indigo-500 hover:text-indigo-600' : 'text-gray-400 hover:text-gray-500'"
+        :active-class="isHome ? 'active-home' : 'active-page'"
+        to="/workspace"
+        @click="handleWorkspaceClick"
+      >
+        工作台
+      </router-link>
+      <router-link 
+        class="font-medium py-1 border-b-2 border-transparent transition-all duration-200 no-underline"
+        :class="isHome ? 'text-indigo-500 hover:text-indigo-600' : 'text-gray-400 hover:text-gray-500'"
+        :active-class="isHome ? 'active-home' : 'active-page'"
+        to="/playground"
+      >
+        演练场
+      </router-link>
     </nav>
   </header>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+import { useChatStore } from '@/stores/chat'
+
+const route = useRoute()
+const chatStore = useChatStore()
+
+const isHome = computed(() => route.path === '/')
+
+function handleWorkspaceClick() {
+  chatStore.currentSessionId = null
+}
 </script>
 
 <style scoped>
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 1.5rem;
-  background: white;
-  border-bottom: 1px solid #eee;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
-}
-
-.logo {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-}
-
-.logo-icon {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #42b883;
-}
-
 .logo-text {
   font-weight: 600;
-  font-size: 1.1rem;
-  color: #35495e;
+  font-size: 16px;
+  background: linear-gradient(135deg, #6366f1, #a855f7, #6366f1, #a855f7);
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradientShift 6s ease-in-out infinite;
 }
 
-.nav-links {
-  display: flex;
-  gap: 1.5rem;
+@keyframes gradientShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
 }
 
-.nav-links a {
-  color: #666;
-  text-decoration: none;
-  font-weight: 500;
-  padding: 0.5rem 0;
-  border-bottom: 2px solid transparent;
-  transition: all 0.2s;
+.active-home {
+  color: #4f46e5;
+  border-color: #818cf8;
 }
 
-.nav-links a:hover {
-  color: #42b883;
-}
-
-.nav-links a.router-link-active {
-  color: #42b883;
-  border-bottom-color: #42b883;
+.active-page {
+  color: #374151;
+  border-color: #d1d5db;
 }
 </style>

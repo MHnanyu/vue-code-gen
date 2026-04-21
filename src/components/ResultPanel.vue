@@ -1,320 +1,270 @@
 <template>
-  <div class="result-panel">
-    <div class="result-header">
-      <el-button type="primary" :icon="RefreshRight" @click="handleRefresh" :disabled="!previewHtml || isPreviewLoading">
-        <span v-if="isPreviewLoading">编译中...</span>
-        <span v-else>刷新预览</span>
-      </el-button>
-      <el-tag v-if="isModified" type="warning" size="small">代码已修改</el-tag>
-      <el-tag v-if="previewError" type="danger" size="small">预览错误</el-tag>
+  <div class="h-full flex flex-col bg-white">
+    <div v-if="!hasFiles && !hasStageContent" class="flex-1 flex items-center justify-center">
+      <el-empty description="生成代码后显示预览" :image-size="80">
+        <template #image>
+          <span class="text-5xl">🎨</span>
+        </template>
+      </el-empty>
     </div>
-    <el-tabs v-model="activeTab" class="result-tabs">
-      <el-tab-pane label="Preview" name="preview">
-        <div class="preview-container">
-          <!-- 错误提示 -->
-          <div v-if="previewError" class="error-overlay">
-            <el-alert type="error" :closable="false" show-icon>
-              <template #title>编译错误</template>
-              <pre>{{ previewError }}</pre>
-            </el-alert>
+    <template v-else>
+      <div class="flex justify-between items-center shrink-0 border-b border-gray-200 bg-white">
+        <el-tabs v-model="activeTab" class="flex-1 result-tabs">
+          <el-tab-pane label="Preview" name="preview" />
+          <el-tab-pane label="Code" name="code" />
+          <el-tab-pane v-if="hasStageContent" label="步骤产物" name="stages" />
+        </el-tabs>
+        <div v-if="activeTab !== 'stages'" class="flex gap-1 px-3 items-center">
+          <div class="flex gap-1.5 mr-1.5 pr-2.5 border-r border-gray-200">
+            <el-tag type="success" effect="plain" size="small">Vue3</el-tag>
+            <el-tag effect="plain" size="small">{{ componentLibLabel }}</el-tag>
           </div>
-
-          <!-- 加载状态 -->
-          <div v-else-if="isPreviewLoading && !previewHtml" class="loading-overlay">
-            <el-icon class="loading-icon"><Loading /></el-icon>
-            <span>正在编译预览...</span>
-          </div>
-
-          <!-- 预览 iframe -->
-          <div v-else-if="previewHtml" class="preview-frame">
-            <iframe
-              ref="previewIframe"
-              :key="iframeKey"
-              :srcdoc="previewHtml"
-              sandbox="allow-scripts allow-same-origin"
-              @load="handleIframeLoad"
-            ></iframe>
-          </div>
-
-          <!-- 空状态 -->
-          <el-empty v-else description="生成代码后显示预览" :image-size="80">
-            <template #image>
-              <span style="font-size: 48px">🎨</span>
-            </template>
-          </el-empty>
+          <el-tooltip content="全屏预览" placement="top">
+            <el-button
+              size="small"
+              :disabled="!hasFiles"
+              @click="goToFullscreenPreview"
+            >
+              <el-icon><FullScreen /></el-icon>
+            </el-button>
+          </el-tooltip>
+          <el-button
+            size="small"
+            type="success"
+            :loading="isSaving"
+            :disabled="!projectStore.isModified"
+            @click="handleSave"
+          >
+            保存并同步
+          </el-button>
+          <el-button
+            size="small"
+            type="primary"
+            :disabled="!replPreviewRef?.isReplReady || activeTab !== 'preview'"
+            @click="replPreviewRef?.exportStaticHtml()"
+          >
+            导出 HTML
+          </el-button>
+          <el-button
+            size="small"
+            type="warning"
+            :disabled="!hasFiles"
+            @click="exportProject"
+          >
+            导出项目
+          </el-button>
         </div>
-      </el-tab-pane>
+      </div>
+      
+      <VueReplPreview
+        v-if="activeTab === 'preview'"
+        ref="replPreviewRef"
+        class="flex-1"
+        :files="projectStore.files"
+        :show-toolbar="false"
+        empty-text="生成代码后显示预览"
+        empty-icon="🎨"
+        loading-text="加载预览中..."
+      />
+      
+      <CodeEditorPanel v-else-if="activeTab === 'code'" />
 
-      <el-tab-pane label="Code" name="code">
-        <div class="code-container">
-          <div class="code-sidebar" v-if="files.length > 0">
-            <div class="sidebar-header">
-              <span>项目文件</span>
-              <el-tag size="small" type="info">{{ fileCount }} 文件</el-tag>
-            </div>
-            <div class="file-list">
-              <FileTreeItem
-                :files="files"
-                :selected-file-id="selectedFileId"
-                @select="handleSelectFile"
-              />
-            </div>
-          </div>
-
-          <div class="code-editor" v-if="selectedFile">
-            <div class="editor-header">
-              <span class="file-path">{{ selectedFile.path }}</span>
-              <el-button text size="small" @click="copyCode">
-                <el-icon><CopyDocument /></el-icon>
-                复制
-              </el-button>
-            </div>
-            <div class="editor-content">
-              <MonacoEditor
-                :value="selectedFile.content || ''"
-                :language="selectedFile.language || 'plaintext'"
-                @update:value="handleContentChange"
-              />
-            </div>
-          </div>
-
-          <el-empty v-else description="选择文件查看内容" :image-size="80">
-            <template #image>
-              <span style="font-size: 48px">📄</span>
-            </template>
-          </el-empty>
-        </div>
-      </el-tab-pane>
-    </el-tabs>
+      <StageOutputPanel
+        v-show="activeTab === 'stages'"
+      />
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { CopyDocument, RefreshRight, Loading } from '@element-plus/icons-vue'
+import { FullScreen } from '@element-plus/icons-vue'
 import { useProjectStore } from '@/stores/project'
-import MonacoEditor from '@/components/MonacoEditor.vue'
-import FileTreeItem from '@/components/FileTree.vue'
-import type { ProjectFile } from '@/types'
+import { useChatStore } from '@/stores/chat'
+import { updateSessionFiles, type ApiFile } from '@/api'
+import { collectAllFiles } from '@/utils/files'
+import { downloadBlob } from '@/utils/download'
+import { getBaseProjectFiles, getMainTs } from '@/templates/project-template'
+import { getCcuiComponentsAsProjectFiles } from '@/templates/ccui-components'
+import CodeEditorPanel from '@/components/CodeEditorPanel.vue'
+import VueReplPreview from '@/components/VueReplPreview.vue'
+import StageOutputPanel from '@/components/StageOutputPanel.vue'
+import type { ProjectFile, ComponentLib } from '@/types'
+import JSZip from 'jszip'
 
+const router = useRouter()
 const projectStore = useProjectStore()
-
+const chatStore = useChatStore()
 const activeTab = ref('preview')
-const iframeKey = ref(0)
-const previewIframe = ref<HTMLIFrameElement | null>(null)
+const isSaving = ref(false)
+const hasStageContent = computed(() => {
+  return chatStore.isStreaming || chatStore.hasStepMessages
+})
+const replPreviewRef = ref<InstanceType<typeof VueReplPreview> | null>(null)
+const hasFiles = computed(() => projectStore.files.length > 0)
 
-const files = computed(() => projectStore.files)
-const selectedFileId = computed(() => projectStore.selectedFileId)
-const selectedFile = computed(() => projectStore.selectedFile)
-const previewHtml = computed(() => projectStore.previewHtml)
-const isPreviewLoading = computed(() => projectStore.isPreviewLoading)
-const previewError = computed(() => projectStore.previewError)
-const isModified = computed(() => projectStore.isModified)
-
-const fileCount = computed(() => {
-  let count = 0
-  function countFiles(items: ProjectFile[]) {
-    items.forEach(item => {
-      if (item.type === 'file') count++
-      if (item.children) countFiles(item.children)
-    })
-  }
-  countFiles(files.value)
-  return count
+const componentLibLabel = computed(() => {
+  const session = chatStore.currentSession
+  const lib = session?.componentLib || 'ElementUI'
+  return COMPONENT_LIB_LABELS[lib] || 'ElementUI'
 })
 
-function handleSelectFile(file: ProjectFile) {
-  projectStore.selectFile(file.id)
+const COMPONENT_LIB_LABELS: Record<ComponentLib, string> = {
+  ElementUI: 'ElementUI',
+  aui: 'AUI',
+  ccui: 'CcUI',
 }
 
-function handleContentChange(content: string) {
-  if (selectedFileId.value) {
-    projectStore.updateFileContent(selectedFileId.value, content)
+function collectEditableApiFiles(): ApiFile[] {
+  const result: ApiFile[] = []
+
+  function collect(files: ProjectFile[]) {
+    for (const f of files) {
+      if (f.type === 'file' && !f.readonly) {
+        result.push({
+          id: f.id,
+          name: f.name,
+          path: f.path,
+          type: f.type,
+          language: f.language,
+          content: f.content,
+        })
+      }
+      if (f.children) {
+        collect(f.children)
+      }
+    }
+  }
+
+  collect(projectStore.files)
+  return result
+}
+
+async function handleSave() {
+  const sessionId = chatStore.currentSessionId
+  if (!sessionId) {
+    ElMessage.warning('没有活动的会话')
+    return
+  }
+
+  isSaving.value = true
+  try {
+    const filesToSave = collectEditableApiFiles()
+    await updateSessionFiles(sessionId, filesToSave)
+    projectStore.clearModified()
+    chatStore.updateSessionFiles(sessionId, filesToSave)
+    ElMessage.success('保存成功')
+  } catch (error) {
+    console.error('Failed to save files:', error)
+    ElMessage.error('保存失败')
+  } finally {
+    isSaving.value = false
   }
 }
 
-function copyCode() {
-  if (selectedFile.value?.content) {
-    navigator.clipboard.writeText(selectedFile.value.content)
-    ElMessage.success('代码已复制到剪贴板')
+function goToFullscreenPreview() {
+  const sessionId = chatStore.currentSessionId
+  if (sessionId) {
+    router.push({ path: '/preview', query: { sessionId } })
   }
 }
 
-function handleRefresh() {
-  // 立即重新生成预览（不走防抖）
-  projectStore.regeneratePreview()
-  // 通过改变iframe的key来强制刷新
-  iframeKey.value++
-  ElMessage.success('预览已刷新')
-}
-
-function handleIframeLoad() {
-  // iframe 加载完成
-  if (projectStore.isPreviewLoading) {
-    // loading 状态会在 store 中自动更新
+watch(() => chatStore.activeStageTab, (key) => {
+  if (key !== null && hasStageContent.value) {
+    activeTab.value = 'stages'
   }
-}
+}, { flush: 'sync' })
 
-// 监听来自 iframe 的错误消息
-window.addEventListener('message', (event) => {
-  if (event.data?.type === 'preview-error') {
-    projectStore.setPreviewError(event.data.message)
+watch(() => chatStore.currentSessionId, () => {
+  if (activeTab.value === 'stages') {
+    activeTab.value = 'preview'
   }
 })
+
+async function exportProject() {
+  const componentLib = chatStore.currentSession?.componentLib || 'ElementUI'
+  const zip = new JSZip()
+  const baseFiles = getBaseProjectFiles(componentLib)
+
+  const findFile = (name: string) => baseFiles.find(f => f.name === name)!
+
+  zip.file('package.json', findFile('package.json').content)
+  zip.file('vite.config.ts', findFile('vite.config.ts').content)
+  zip.file('tsconfig.json', findFile('tsconfig.json').content)
+  zip.file('index.html', findFile('index.html').content)
+
+  const srcFolder = zip.folder('src')
+  if (!srcFolder) {
+    ElMessage.error('创建 src 目录失败')
+    return
+  }
+
+  srcFolder.file('main.ts', getMainTs(componentLib))
+  srcFolder.file('App.vue', findFile('App.vue').content)
+  srcFolder.file('style.css', findFile('style.css').content)
+  srcFolder.file('vite-env.d.ts', findFile('vite-env.d.ts').content)
+
+  if (componentLib === 'ccui') {
+    const ccuiFolder = srcFolder.folder('ccui')
+    const ccuiComponents = getCcuiComponentsAsProjectFiles()
+
+    function addCcuiFiles(files: ProjectFile[], parentFolder: JSZip) {
+      for (const file of files) {
+        if (file.type === 'folder' && file.children) {
+          const subFolder = parentFolder.folder(file.name)
+          if (subFolder) {
+            addCcuiFiles(file.children, subFolder)
+          }
+        } else if (file.type === 'file' && file.content) {
+          parentFolder.file(file.name, file.content)
+        }
+      }
+    }
+
+    addCcuiFiles(ccuiComponents, ccuiFolder!)
+  }
+
+  const allFiles = collectAllFiles(projectStore.files)
+  const baseFileNames = baseFiles.map(f => f.name)
+  const userFiles = allFiles.filter(f => 
+    f.type === 'file' && 
+    !f.readonly && 
+    f.content &&
+    !baseFileNames.includes(f.name) &&
+    !f.path.includes('/ccui/')
+  )
+
+  for (const file of userFiles) {
+    const filePath = file.path.startsWith('/') ? file.path.slice(1) : file.path
+    if (filePath.startsWith('src/')) {
+      srcFolder.file(filePath.replace('src/', ''), file.content!)
+    } else {
+      zip.file(filePath, file.content!)
+    }
+  }
+
+  try {
+    const blob = await zip.generateAsync({ type: 'blob' })
+    downloadBlob(blob, 'vue-project.zip', 'application/zip')
+    ElMessage.success('项目导出成功')
+  } catch (error) {
+    console.error('Export project failed:', error)
+    ElMessage.error('导出项目失败')
+  }
+}
 </script>
 
 <style scoped>
-.result-panel {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-}
-
-.result-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  background: #fafafa;
-  border-bottom: 1px solid #eee;
-}
-
-.result-tabs {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
 .result-tabs :deep(.el-tabs__header) {
   margin: 0;
   padding: 0 16px;
-  background: #fafafa;
+  border-bottom: none;
+  background: transparent;
 }
 
 .result-tabs :deep(.el-tabs__content) {
-  flex: 1;
-  overflow: hidden;
-}
-
-.result-tabs :deep(.el-tab-pane) {
-  height: 100%;
-}
-
-.preview-container,
-.code-container {
-  height: 100%;
-  display: flex;
-  overflow: hidden;
-}
-
-.preview-frame {
-  flex: 1;
-  padding: 16px;
-  background: #f5f5f5;
-}
-
-.preview-frame iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-}
-
-.loading-overlay {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  color: #909399;
-}
-
-.loading-icon {
-  font-size: 32px;
-  animation: spin 1s linear infinite;
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-.error-overlay {
-  flex: 1;
-  padding: 16px;
-  overflow: auto;
-}
-
-.error-overlay pre {
-  margin-top: 8px;
-  padding: 12px;
-  background: #fef0f0;
-  border-radius: 4px;
-  font-size: 12px;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-.code-sidebar {
-  width: 240px;
-  border-right: 1px solid #e4e7ed;
-  display: flex;
-  flex-direction: column;
-}
-
-.sidebar-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid #eee;
-  font-weight: 500;
-  color: #303133;
-}
-
-.file-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 8px;
-}
-
-.code-editor {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.editor-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 16px;
-  background: #fafafa;
-  border-bottom: 1px solid #eee;
-}
-
-.file-path {
-  font-family: monospace;
-  font-size: 13px;
-  color: #606266;
-}
-
-.editor-content {
-  flex: 1;
-  overflow: hidden;
-}
-
-:deep(.el-empty) {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
+  display: none;
 }
 </style>

@@ -9,19 +9,19 @@
 
       <div class="editor-container">
         <MonacoEditor
-          v-if="activeTab === 'html'"
+          v-show="activeTab === 'html'"
           :value="previewStore.html"
           language="html"
           @update:value="previewStore.setHtml"
         />
         <MonacoEditor
-          v-if="activeTab === 'css'"
+          v-show="activeTab === 'css'"
           :value="previewStore.css"
           language="css"
           @update:value="previewStore.setCss"
         />
         <MonacoEditor
-          v-if="activeTab === 'js'"
+          v-show="activeTab === 'js'"
           :value="previewStore.javascript"
           language="javascript"
           @update:value="previewStore.setJavascript"

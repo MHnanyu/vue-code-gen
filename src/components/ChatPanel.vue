@@ -1,79 +1,134 @@
 <template>
-  <div class="chat-panel">
-    <div class="chat-header">
-      <h3>AI 对话</h3>
+  <div class="h-full flex flex-col bg-white">
+    <div class="flex justify-between items-center px-4 py-4 border-b border-gray-200">
+      <div class="flex items-center gap-2">
+        <el-button
+          v-if="historyCollapsed"
+          text
+          size="small"
+          @click="$emit('toggle-history')"
+          title="展开历史记录"
+        >
+          <el-icon><DArrowRight /></el-icon>
+        </el-button>
+        <h3 class="m-0 text-base text-gray-800">AI 对话</h3>
+      </div>
       <el-tag v-if="currentSession" size="small" type="info">
         {{ currentSession.messages.length }} 条消息
       </el-tag>
     </div>
 
-    <div class="chat-messages" ref="messagesContainer">
-      <template v-if="currentSession?.messages.length">
-        <div
-          v-for="message in currentSession.messages"
-          :key="message.id"
-          class="message"
-          :class="message.role"
-        >
-          <div class="message-avatar">
-            <el-avatar :size="32" :style="{ background: message.role === 'user' ? '#409eff' : '#67c23a' }">
-              {{ message.role === 'user' ? 'U' : 'AI' }}
-            </el-avatar>
-          </div>
-          <div class="message-content">
-            <div class="message-text">{{ message.content }}</div>
-            <div class="message-time">{{ formatTime(message.timestamp) }}</div>
+    <div class="flex-1 overflow-y-auto p-4" ref="messagesContainer">
+      <template v-if="sessionMessages.length || chatStore.isStreaming">
+        <template v-for="(message, idx) in sessionMessages" :key="message.id">
+          <UserMessageBubble v-if="message.role === 'user'" :message="message" />
+
+          <AssistantMessageBubble
+            v-else-if="message.role === 'assistant'"
+            :message="message"
+            :index="idx"
+            :show-progress="shouldShowMessageProgress(message, idx)"
+            :progress-stages="getMessageProgress(message, idx)"
+            :is-last="isLastAssistantMessage(idx)"
+            :is-retrying="chatStore.isRetrying"
+            :is-streaming="chatStore.isStreaming"
+            :show-error="showErrorMessage(message, idx)"
+            :retry-fn="getRetryFn(idx, message)"
+            @stage-click="(stage: StageProgressState) => handleStageClick(stage, message)"
+          />
+        </template>
+
+        <StreamingBubble
+          v-if="showStreamingBubble"
+          :stages="chatStore.stageProgresses"
+          :is-streaming="true"
+          :retry-fn="handleRetryFromStage"
+          :cancel-fn="chatStore.cancelStreaming"
+          :label="streamingBubbleLabel"
+          @stage-click="handleStageClick"
+        />
+
+        <div v-if="showPendingLoading" class="px-11 mb-5">
+          <div class="px-4 py-3 rounded-xl bg-gray-100 inline-flex items-center">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <span class="ml-2 text-gray-500">正在生成...</span>
           </div>
         </div>
       </template>
-      <el-empty v-else description="开始新的对话吧" :image-size="80">
+
+      <div v-else-if="isLoading && pendingUserMessage" class="flex flex-col gap-3">
+        <div class="flex gap-3 flex-row-reverse">
+          <div class="flex-shrink-0">
+            <el-avatar :size="32" style="background: #409eff">U</el-avatar>
+          </div>
+          <div class="px-4 py-3 rounded-xl bg-blue-500 text-white">{{ pendingUserMessage }}</div>
+        </div>
+        <StreamingBubble
+          v-if="chatStore.isStreaming || chatStore.stageProgresses.length > 0"
+          :stages="chatStore.stageProgresses"
+          :is-streaming="chatStore.isStreaming"
+          :retry-fn="handleRetryFromStage"
+          :cancel-fn="chatStore.cancelStreaming"
+          label="正在生成..."
+          @stage-click="handleStageClick"
+        />
+        <div v-else class="px-11">
+          <div class="px-4 py-3 rounded-xl bg-gray-100 inline-flex items-center">
+            <el-icon class="is-loading"><Loading /></el-icon>
+            <span class="ml-2 text-gray-500">正在生成...</span>
+          </div>
+        </div>
+      </div>
+      <el-empty v-else description="开始新的对话吧" :image-size="80" class="empty-box">
         <template #image>
-          <span style="font-size: 48px">💬</span>
+          <span class="text-5xl">💬</span>
         </template>
       </el-empty>
     </div>
 
-    <div class="chat-input">
-      <el-input
-        v-model="inputMessage"
-        type="textarea"
-        :rows="3"
-        :placeholder="placeholder"
-        resize="none"
-        @keydown.enter.ctrl="sendMessage"
-      />
-      <div class="input-actions">
-        <span class="hint">Ctrl + Enter 发送</span>
-        <el-button type="primary" :loading="isLoading" :disabled="!inputMessage.trim()" @click="sendMessage">
-          发送
-        </el-button>
-      </div>
-    </div>
+    <ChatInput
+      v-model="inputMessage"
+      :placeholder="placeholder"
+      :loading="isLoading"
+      :streaming="chatStore.isStreaming"
+      @send="sendMessage"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { computed, watch, nextTick, onUnmounted } from 'vue'
+import { DArrowRight, Loading } from '@element-plus/icons-vue'
 import { useChatStore } from '@/stores/chat'
-import { useProjectStore } from '@/stores/project'
-import { generateMockProject, generatePreviewHtml, generateMockAIResponse, delay } from '@/api/mock'
+import type { StageProgressState, ChatMessage } from '@/types'
+import StreamingBubble from '@/components/StreamingBubble.vue'
+import UserMessageBubble from '@/components/UserMessageBubble.vue'
+import AssistantMessageBubble from '@/components/AssistantMessageBubble.vue'
+import ChatInput from '@/components/ChatInput.vue'
+import { useStageProgress } from '@/composables/useStageProgress'
+import { useGeneration } from '@/composables/useGeneration'
 
-const props = defineProps<{
-  initialPrompt?: string
+defineProps<{
+  historyCollapsed?: boolean
 }>()
 
-const emit = defineEmits<{
-  generated: []
+defineEmits<{
+  'toggle-history': []
 }>()
 
 const chatStore = useChatStore()
-const projectStore = useProjectStore()
 
-const inputMessage = ref('')
-const messagesContainer = ref<HTMLElement | null>(null)
+const {
+  isLastAssistantMessage,
+  shouldShowMessageProgress,
+  getMessageProgress,
+  showErrorMessage,
+  showStreamingBubble,
+  streamingBubbleLabel,
+} = useStageProgress()
 
 const currentSession = computed(() => chatStore.currentSession)
-const isLoading = computed(() => chatStore.isLoading)
+const sessionMessages = computed(() => currentSession.value?.messages ?? [])
 
 const placeholder = computed(() =>
   currentSession.value
@@ -81,9 +136,10 @@ const placeholder = computed(() =>
     : '输入您的需求，开始生成代码...'
 )
 
-watch(currentSession, () => {
-  scrollToBottom()
-})
+function getRetryFn(idx: number, message: ChatMessage): ((stage: number) => void) | undefined {
+  if (!isLastAssistantMessage(idx) || chatStore.isStreaming) return undefined
+  return (stage: number) => handleRetryFromStage(stage, message)
+}
 
 function scrollToBottom() {
   nextTick(() => {
@@ -93,146 +149,49 @@ function scrollToBottom() {
   })
 }
 
-async function sendMessage() {
-  const message = inputMessage.value.trim()
-  if (!message || isLoading.value) return
+const {
+  inputMessage,
+  pendingUserMessage,
+  currentAttachments,
+  isLoading,
+  messagesContainer,
+  sendMessage,
+  handleRetryFromStage,
+  handleStageClick,
+} = useGeneration(scrollToBottom)
 
-  inputMessage.value = ''
+const showPendingLoading = computed(() =>
+  isLoading.value
+  && !chatStore.isStreaming
+  && chatStore.currentSession?.messages.length === 0
+  && pendingUserMessage.value
+)
 
-  // 如果没有当前会话，创建一个新的
-  let sessionId = chatStore.currentSessionId
-  if (!sessionId) {
-    const session = chatStore.createSession(message)
-    sessionId = session.id
-  }
-
-  // 添加用户消息
-  chatStore.addMessage(sessionId, { role: 'user', content: message })
+watch(currentSession, () => {
   scrollToBottom()
+})
 
-  // 设置加载状态
-  chatStore.setLoading(true)
-
-  // 模拟AI响应延迟
-  await delay(1500)
-
-  // 生成项目文件
-  const files = generateMockProject(message)
-  projectStore.setFiles(files)
-  projectStore.setPreviewHtml(generatePreviewHtml())
-
-  // 添加AI回复
-  const aiResponse = generateMockAIResponse(message)
-  chatStore.addMessage(sessionId, { role: 'assistant', content: aiResponse })
-
-  chatStore.setLoading(false)
-  scrollToBottom()
-
-  emit('generated')
-}
-
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
-}
-
-// 处理初始提示
-watch(() => props.initialPrompt, (prompt) => {
+watch(() => chatStore.pendingPrompt, (prompt) => {
   if (prompt && prompt.trim()) {
+    chatStore.setPendingPrompt(null)
     inputMessage.value = prompt
+
+    if (chatStore.pendingAttachments.length > 0) {
+      currentAttachments.value = [...chatStore.pendingAttachments]
+      chatStore.clearPendingAttachments()
+    }
+
     sendMessage()
   }
 }, { immediate: true })
+
+onUnmounted(() => {
+  chatStore.cancelStreaming()
+})
 </script>
 
 <style scoped>
-.chat-panel {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-}
-
-.chat-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  border-bottom: 1px solid #eee;
-}
-
-.chat-header h3 {
-  margin: 0;
-  font-size: 16px;
-  color: #303133;
-}
-
-.chat-messages {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px;
-}
-
-.message {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.message.user {
-  flex-direction: row-reverse;
-}
-
-.message-avatar {
-  flex-shrink: 0;
-}
-
-.message-content {
-  max-width: 80%;
-}
-
-.message.user .message-content {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-
-.message-text {
-  padding: 12px 16px;
-  border-radius: 12px;
-  background: #f5f7fa;
-  line-height: 1.6;
-  word-break: break-word;
-}
-
-.message.user .message-text {
-  background: #409eff;
-  color: white;
-}
-
-.message-time {
-  font-size: 12px;
-  color: #909399;
-  margin-top: 4px;
-}
-
-.chat-input {
-  padding: 16px;
-  border-top: 1px solid #eee;
-}
-
-.input-actions {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-top: 12px;
-}
-
-.hint {
-  font-size: 12px;
-  color: #909399;
-}
-
-:deep(.el-empty) {
+.empty-box :deep(.el-empty) {
   flex: 1;
   display: flex;
   flex-direction: column;

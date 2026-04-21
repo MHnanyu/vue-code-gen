@@ -1,18 +1,25 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { useDebounceFn } from '@vueuse/core'
 import type { ProjectFile } from '@/types'
-import { createPreview } from '@/preview'
 
 export const useProjectStore = defineStore('project', () => {
   const files = ref<ProjectFile[]>([])
   const selectedFileId = ref<string | null>(null)
-  const previewHtml = ref('')
-  const isPreviewLoading = ref(false)
-  const previewError = ref<string | null>(null)
   const isModified = ref(false)
 
   const selectedFile = computed(() => findFileById(files.value, selectedFileId.value))
+
+  const editableFiles = computed(() => filterEditableFiles(files.value))
+
+  function filterEditableFiles(fileList: ProjectFile[]): ProjectFile[] {
+    return fileList
+      .filter(f => !f.readonly)
+      .map(f => ({
+        ...f,
+        children: f.children ? filterEditableFiles(f.children) : undefined
+      }))
+      .filter(f => f.type === 'file' || (f.children && f.children.length > 0))
+  }
 
   function findFileById(files: ProjectFile[], id: string | null): ProjectFile | null {
     if (!id) return null
@@ -29,12 +36,9 @@ export const useProjectStore = defineStore('project', () => {
   function setFiles(newFiles: ProjectFile[]) {
     files.value = newFiles
     if (newFiles.length > 0 && !selectedFileId.value) {
-      // 默认选中第一个文件
       const firstFile = findFirstFile(newFiles)
       if (firstFile) selectedFileId.value = firstFile.id
     }
-    // 设置文件后立即生成预览
-    generatePreview()
   }
 
   function findFirstFile(files: ProjectFile[]): ProjectFile | null {
@@ -57,89 +61,88 @@ export const useProjectStore = defineStore('project', () => {
     if (file) {
       file.content = content
       isModified.value = true
-      // 使用防抖更新预览（2秒延迟）
-      debouncedGeneratePreview()
     }
-  }
-
-  function setPreviewHtml(html: string) {
-    previewHtml.value = html
   }
 
   function clearProject() {
     files.value = []
     selectedFileId.value = null
-    previewHtml.value = ''
-    previewError.value = null
     isModified.value = false
-    isPreviewLoading.value = false
   }
 
-  // 生成预览（内部方法）
-  function generatePreview() {
-    if (files.value.length === 0) {
-      previewHtml.value = ''
-      return
-    }
-
-    try {
-      isPreviewLoading.value = true
-      previewError.value = null
-
-      // 使用新的预览系统生成 HTML
-      previewHtml.value = createPreview(files.value, {
-        title: 'Vue3 Live Preview',
-        autoDetectLibrary: true,
-      })
-
-      isModified.value = false
-    } catch (error) {
-      previewError.value = error instanceof Error ? error.message : 'Preview generation failed'
-      console.error('Preview generation error:', error)
-    } finally {
-      isPreviewLoading.value = false
-    }
-  }
-
-  // 防抖版本（2秒延迟）
-  const debouncedGeneratePreview = useDebounceFn(generatePreview, 2000)
-
-  // 立即重新生成预览（用于刷新按钮）
-  function regeneratePreview() {
-    generatePreview()
-  }
-
-  // 标记为已修改
-  function markModified() {
-    isModified.value = true
-  }
-
-  // 清除修改标记
   function clearModified() {
     isModified.value = false
   }
 
-  // 设置预览错误
-  function setPreviewError(error: string | null) {
-    previewError.value = error
+  function addFile() {
+    const id = crypto.randomUUID()
+    const name = `NewFile_${Date.now()}.vue`
+    const newFile: ProjectFile = {
+      id,
+      name,
+      path: `/src/${name}`,
+      type: 'file',
+      content: '<template>\n  <div>\n    \n  </div>\n</template>\n\n<script setup lang="ts">\n\n</script>\n\n<style scoped>\n\n</style>\n',
+      language: 'vue',
+      readonly: false,
+    }
+    const srcFolder = files.value.find(f => f.path === '/src')
+    if (srcFolder && srcFolder.children) {
+      srcFolder.children.push(newFile)
+    } else {
+      files.value.push(newFile)
+    }
+    selectedFileId.value = id
+    isModified.value = true
+    return newFile
+  }
+
+  function deleteFile(id: string) {
+    function removeFromList(list: ProjectFile[]): boolean {
+      const index = list.findIndex(f => f.id === id)
+      if (index !== -1) {
+        list.splice(index, 1)
+        return true
+      }
+      for (const f of list) {
+        if (f.children && removeFromList(f.children)) {
+          return true
+        }
+      }
+      return false
+    }
+    
+    removeFromList(files.value)
+    if (selectedFileId.value === id) {
+      selectedFileId.value = null
+    }
+    isModified.value = true
+  }
+
+  function renameFile(id: string, newName: string) {
+    const file = findFileById(files.value, id)
+    if (file) {
+      file.name = newName
+      const pathParts = file.path.split('/')
+      pathParts[pathParts.length - 1] = newName
+      file.path = pathParts.join('/')
+      isModified.value = true
+    }
   }
 
   return {
     files,
     selectedFileId,
-    previewHtml,
-    isPreviewLoading,
-    previewError,
     isModified,
     selectedFile,
+    editableFiles,
     setFiles,
     selectFile,
     updateFileContent,
-    setPreviewHtml,
     clearProject,
-    regeneratePreview,
-    markModified,
     clearModified,
-    setPreviewError,
+    addFile,
+    deleteFile,
+    renameFile,
   }
 })
