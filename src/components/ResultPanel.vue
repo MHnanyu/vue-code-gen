@@ -114,7 +114,14 @@ const replPreviewRef = ref<InstanceType<typeof VueReplPreview> | null>(null)
 const hasFiles = computed(() => projectStore.files.length > 0)
 
 const showAgentOutput = computed(() => {
-  return (agentState.isStreaming && agentState.toolCalls.length > 0) || agentState.toolCallContents.size > 0
+  if ((agentState.isStreaming && agentState.toolCalls.length > 0) || agentState.toolCallContents.size > 0) {
+    return true
+  }
+  const session = chatStore.currentSession
+  if (session?.mode === 'agent') {
+    return session.messages.some(m => m.role === 'assistant' && m.toolCalls && m.toolCalls.length > 0)
+  }
+  return false
 })
 
 const componentLibLabel = computed(() => {

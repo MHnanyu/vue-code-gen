@@ -57,8 +57,8 @@ export function useChatStageState() {
     })
   }
 
-  function setActiveStageTab(stageName: string | null): void {
-    if (activeStageTab.value === stageName && stageName !== null) {
+  function setActiveStageTab(stageName: string | null, force = false): void {
+    if (!force && activeStageTab.value === stageName && stageName !== null) {
       activeStageTab.value = null
       return
     }

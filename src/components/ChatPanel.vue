@@ -243,7 +243,7 @@ function handleViewOutput(url: string) {
     if (msg.agentMetadata?.toolCalls?.length) {
       for (const tc of msg.agentMetadata.toolCalls) {
         if (tc.outputPaths?.includes(url)) {
-          chatStore.setActiveStageTab(tc.toolName)
+          chatStore.setActiveStageTab(tc.toolName, true)
           return
         }
       }
@@ -251,7 +251,7 @@ function handleViewOutput(url: string) {
     if (msg.toolCalls?.length) {
       for (const tc of msg.toolCalls) {
         if (tc.outputPaths?.includes(url)) {
-          chatStore.setActiveStageTab(tc.toolName)
+          chatStore.setActiveStageTab(tc.toolName, true)
           return
         }
       }
