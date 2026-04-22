@@ -184,13 +184,13 @@ function goToFullscreenPreview() {
 }
 
 watch(() => chatStore.activeStageTab, (key) => {
-  if (key !== null && hasStageContent.value) {
+  if (key !== null) {
     activeTab.value = 'stages'
   }
 }, { flush: 'sync' })
 
 watch(() => agentState.toolCalls.length, (len, prevLen) => {
-  if (len > (prevLen || 0) && hasStageContent.value) {
+  if (len > (prevLen || 0) && len > 0) {
     activeTab.value = 'stages'
   }
 })

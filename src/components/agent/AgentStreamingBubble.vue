@@ -10,8 +10,9 @@
             :tool-name="tc.toolName"
             :label="tc.label"
             :status="tc.status"
-            :output-urls="tc.outputUrls"
-            :output-type="tc.outputType"
+            :output-paths="tc.outputPaths"
+            :render-type="tc.renderType"
+            :duration="tc.duration"
             @view-output="(url: string) => emit('view-output', url)"
           />
         </template>

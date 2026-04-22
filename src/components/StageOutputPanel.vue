@@ -138,10 +138,12 @@ const completedStages = computed<CompletedStage[]>(() => {
 })
 
 const hasStageContent = computed(() => {
-  return chatStore.isStreaming || completedStages.value.length > 0 || chatStore.hasStepMessages || stageContentCache.value.size > 0
+  return chatStore.isStreaming || completedStages.value.length > 0 || chatStore.hasStepMessages
 })
 
-watch(hasStageContent, (val) => {
+watch(() => {
+  return chatStore.isStreaming || completedStages.value.length > 0 || chatStore.hasStepMessages
+}, (val) => {
   emit('has-stage-content-change', val)
 }, { immediate: true })
 
@@ -267,21 +269,20 @@ async function ensureStageContentLoaded(key: string) {
 }
 
 watch(() => chatStore.activeStageTab, async (key) => {
-  if (key !== null && hasStageContent.value) {
-    let target = completedStages.value.find(s => s._key === key)
-    if (!target) {
-      target = completedStages.value.find(s => s.stageName === key && s._key.endsWith('_live'))
-    }
-    if (!target) {
-      target = [...completedStages.value].reverse().find(s => s.stageName === key && !s._key.endsWith('_live'))
-    }
-    if (target) {
-      skipActiveStageKeyLoad = true
-      activeStageKey.value = target._key
-      await ensureStageContentLoaded(target._key)
-    }
+  if (key === null || (!chatStore.isStreaming && !chatStore.hasStepMessages)) return
+  let target = completedStages.value.find(s => s._key === key)
+  if (!target) {
+    target = completedStages.value.find(s => s.stageName === key && s._key.endsWith('_live'))
   }
-}, { flush: 'sync' })
+  if (!target) {
+    target = [...completedStages.value].reverse().find(s => s.stageName === key && !s._key.endsWith('_live'))
+  }
+  if (target) {
+    skipActiveStageKeyLoad = true
+    activeStageKey.value = target._key
+    await ensureStageContentLoaded(target._key)
+  }
+})
 
 watch(() => activeStageKey.value, async (key) => {
   if (key && !skipActiveStageKeyLoad) {

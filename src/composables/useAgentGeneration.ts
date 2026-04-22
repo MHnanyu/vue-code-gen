@@ -4,7 +4,6 @@ import { useChatStore } from '@/stores/chat'
 import { useProjectStore } from '@/stores/project'
 import { generateAgentStream, type AgentSSECallbacks, type Attachment, fetchStageFile } from '@/api'
 import type { AgentFileItem } from '@/types'
-import { AGENT_OUTPUT_URL_TOOLS } from '@/constants/agent'
 
 export function useAgentGeneration(scrollToBottom: () => void) {
   const chatStore = useChatStore()
@@ -20,7 +19,7 @@ export function useAgentGeneration(scrollToBottom: () => void) {
   function buildCallbacks(sessionId: string): AgentSSECallbacks {
     return {
       onAgentThinking(event) {
-        if (!agentState.currentTaskId) {
+        if (event.taskId && !agentState.currentTaskId) {
           agentState.currentTaskId = event.taskId
         }
         agentState.appendThinking(event.content)
@@ -28,73 +27,93 @@ export function useAgentGeneration(scrollToBottom: () => void) {
       },
 
       onToolCallStart(event) {
-        agentState.addToolCall(event.toolName, event.step, event.arguments)
+        agentState.addToolCall(event.toolCallId, event.toolName, event.arguments)
         scrollToBottom()
       },
 
       async onToolCallResult(event) {
-        const isFailed = event.status === 'failed' || !!event.error || !!event.result?.error
+        const isFailed = event.status === 'failed'
 
         if (isFailed) {
-          agentState.failToolCall(event.toolName, event.result, event.error || event.result?.error)
+          agentState.failToolCall(event.toolCallId, event.toolName, event.message ?? undefined)
           scrollToBottom()
           return
         }
 
-        const hasOutput = event.outputUrls && event.outputUrls.length > 0 && AGENT_OUTPUT_URL_TOOLS.has(event.toolName)
-        if (hasOutput) {
-          agentState.completeToolCall(event.toolName, event.outputUrls, event.outputType, event.result)
+        const hasOutput = event.outputPaths && event.outputPaths.length > 0
 
-          if (event.outputType === 'file') {
-            try {
-              const content = await fetchStageFile(event.outputUrls[0])
-              agentState.setToolCallContent(event.toolName, { type: 'markdown', content, files: null })
-            } catch (e) {
-              console.error(`Failed to fetch agent tool output for ${event.toolName}:`, e)
+        if (hasOutput && event.renderType === 'text') {
+          agentState.completeToolCall(
+            event.toolCallId,
+            event.toolName,
+            event.outputPaths,
+            event.renderType,
+            event.result ?? undefined,
+            event.message ?? undefined,
+            event.duration ?? undefined,
+          )
+          try {
+            const content = await fetchStageFile(event.outputPaths![0])
+            agentState.setToolCallContent(event.toolName, { type: 'markdown', content, files: null })
+          } catch (e) {
+            console.error(`Failed to fetch agent tool output for ${event.toolName}:`, e)
+            agentState.setToolCallContent(event.toolName, { type: 'markdown', content: '内容加载失败', files: null })
+          }
+        } else if (hasOutput && event.renderType === 'code') {
+          agentState.completeToolCall(
+            event.toolCallId,
+            event.toolName,
+            event.outputPaths,
+            event.renderType,
+            event.result ?? undefined,
+            event.message ?? undefined,
+            event.duration ?? undefined,
+          )
+          try {
+            const fetchResults = await Promise.allSettled(
+              event.outputPaths!.map(async (url) => {
+                const code = await fetchStageFile(url)
+                const fileName = url.split('/').pop() || 'Unknown.vue'
+                return {
+                  id: `agent_${url}`,
+                  name: fileName,
+                  path: url,
+                  type: 'file' as const,
+                  language: 'vue' as const,
+                  content: code,
+                }
+              }),
+            )
+            const apiFiles = fetchResults
+              .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+              .map(r => r.value)
+
+            agentState.setToolCallContent(event.toolName, { type: 'vue', content: null, files: apiFiles })
+
+            const projectStore = useProjectStore()
+            projectStore.setFilesFromApiFiles(apiFiles, chatStore.currentSession?.componentLib)
+            if (chatStore.currentSessionId) {
+              chatStore.updateSessionFiles(chatStore.currentSessionId, apiFiles)
             }
-          } else if (event.outputType === 'files') {
-            try {
-              const fetchResults = await Promise.allSettled(
-                event.outputUrls.map(async (url) => {
-                  const code = await fetchStageFile(url)
-                  const fileName = url.split('/').pop() || 'Unknown.vue'
-                  return {
-                    id: `agent_${url}`,
-                    name: fileName,
-                    path: url,
-                    type: 'file' as const,
-                    language: 'vue' as const,
-                    content: code,
-                  }
-                }),
-              )
-              const apiFiles = fetchResults
-                .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
-                .map(r => r.value)
-
-              agentState.setToolCallContent(event.toolName, { type: 'vue', content: null, files: apiFiles })
-
-              const projectStore = useProjectStore()
-              projectStore.setFilesFromApiFiles(apiFiles, chatStore.currentSession?.componentLib)
-              if (chatStore.currentSessionId) {
-                chatStore.updateSessionFiles(chatStore.currentSessionId, apiFiles)
-              }
-            } catch (e) {
-              console.error(`Failed to fetch agent tool files for ${event.toolName}:`, e)
-            }
+          } catch (e) {
+            console.error(`Failed to fetch agent tool files for ${event.toolName}:`, e)
+            agentState.setToolCallContent(event.toolName, { type: 'vue', content: null, files: [] })
           }
         } else {
-          agentState.completeToolCall(event.toolName, [], null, event.result)
+          agentState.completeToolCall(
+            event.toolCallId,
+            event.toolName,
+            null,
+            null,
+            event.result ?? undefined,
+            event.message ?? undefined,
+            event.duration ?? undefined,
+          )
         }
         scrollToBottom()
       },
 
-      onToolCallError(event) {
-        agentState.failToolCall(event.toolName, { error: event.error }, event.error)
-        scrollToBottom()
-      },
-
-      async onAgentDone(_event) {
+      onAgentDone(_event) {
         agentState.isDone = true
       },
 
@@ -135,11 +154,12 @@ export function useAgentGeneration(scrollToBottom: () => void) {
               toolName: tc.toolName,
               label: tc.label,
               status: tc.status,
-              step: tc.step,
-              outputUrls: tc.outputUrls,
-              outputType: tc.outputType,
+              outputPaths: tc.outputPaths,
+              renderType: tc.renderType,
               arguments: tc.arguments,
               result: tc.result,
+              message: tc.message,
+              duration: tc.duration,
             })),
             files: event.files.map((f: AgentFileItem) => ({
               name: f.name,
@@ -155,10 +175,9 @@ export function useAgentGeneration(scrollToBottom: () => void) {
         scrollToBottom()
       },
 
-      onAgentCancelled(event) {
+      onAgentCancelled(_event) {
         agentState.currentTaskId = null
         agentState.isStreaming = false
-        agentState.cancelledStep = event.cancelledAtStep
 
         chatStore.addMessageLocal(sessionId, {
           role: 'assistant',
@@ -169,11 +188,12 @@ export function useAgentGeneration(scrollToBottom: () => void) {
               toolName: tc.toolName,
               label: tc.label,
               status: tc.status,
-              step: tc.step,
-              outputUrls: tc.outputUrls,
-              outputType: tc.outputType,
+              outputPaths: tc.outputPaths,
+              renderType: tc.renderType,
               arguments: tc.arguments,
               result: tc.result,
+              message: tc.message,
+              duration: tc.duration,
             })),
           },
         })
@@ -186,7 +206,6 @@ export function useAgentGeneration(scrollToBottom: () => void) {
         agentState.currentTaskId = null
         agentState.isStreaming = false
         agentState.errorMessage = event.message
-        agentState.failedStep = event.failedStep
 
         chatStore.addMessageLocal(sessionId, {
           role: 'assistant',
@@ -197,11 +216,12 @@ export function useAgentGeneration(scrollToBottom: () => void) {
               toolName: tc.toolName,
               label: tc.label,
               status: tc.status,
-              step: tc.step,
-              outputUrls: tc.outputUrls,
-              outputType: tc.outputType,
+              outputPaths: tc.outputPaths,
+              renderType: tc.renderType,
               arguments: tc.arguments,
               result: tc.result,
+              message: tc.message,
+              duration: tc.duration,
             })),
           },
         })
@@ -248,7 +268,7 @@ export function useAgentGeneration(scrollToBottom: () => void) {
     }
   }
 
-  async function retryAgentGeneration(fromStep = 0) {
+  async function retryAgentGeneration() {
     const sessionId = chatStore.currentSessionId
     const session = chatStore.currentSession
     if (!sessionId || !session || agentState.isStreaming) return
@@ -276,7 +296,6 @@ export function useAgentGeneration(scrollToBottom: () => void) {
           prompt: lastUserMessage.content,
           sessionId,
           componentLib: chatStore.currentSession?.componentLib,
-          fromStep,
         },
         callbacks,
       )

@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue'
 import { cancelGeneration as apiCancelGeneration } from '@/api'
 import type { AgentToolCallState } from '@/types'
-import { AGENT_TOOL_LABELS } from '@/constants/agent'
+import { buildCallingLabel, buildCompletedLabel, buildFailedLabel } from '@/constants/agent'
 
 export interface ToolCallContent {
   type: 'markdown' | 'vue'
@@ -19,47 +19,56 @@ export function useAgentState() {
   const agentFiles = ref<any[]>([])
   const isDone = ref(false)
   const errorMessage = ref<string | null>(null)
-  const failedStep = ref<number | null>(null)
-  const cancelledStep = ref<number | null>(null)
 
   const currentToolCall = computed(() =>
     toolCalls.value.find(t => t.status === 'calling') ?? null
   )
 
-  const isCompleted = computed(() => isDone.value || !!errorMessage.value || cancelledStep.value !== null)
+  const isCompleted = computed(() => isDone.value || !!errorMessage.value)
 
   function appendThinking(text: string) {
     thinkingContent.value += text
   }
 
-  function addToolCall(toolName: string, step: number, arguments_?: string): void {
+  function addToolCall(toolCallId: string, toolName: string, arguments_?: string): void {
     toolCalls.value.push({
+      toolCallId,
       toolName,
       status: 'calling',
-      step,
-      label: AGENT_TOOL_LABELS[toolName] || toolName,
-      outputUrls: [],
-      outputType: null,
+      label: buildCallingLabel(toolName, arguments_),
+      outputPaths: null,
+      renderType: null,
       arguments: arguments_,
     })
   }
 
-  function completeToolCall(toolName: string, outputUrls: string[], outputType: 'file' | 'files' | null, result?: Record<string, any>): void {
-    const tc = toolCalls.value.find(t => t.toolName === toolName && t.status === 'calling')
+  function completeToolCall(
+    toolCallId: string,
+    toolName: string,
+    outputPaths: string[] | null,
+    renderType: 'text' | 'code' | null,
+    result?: Record<string, any>,
+    message?: string,
+    duration?: number,
+  ): void {
+    const tc = toolCalls.value.find(t => t.toolCallId === toolCallId && t.status === 'calling')
     if (tc) {
       tc.status = 'completed'
-      tc.outputUrls = outputUrls
-      tc.outputType = outputType
+      tc.label = buildCompletedLabel(toolName, result, message, outputPaths, duration)
+      tc.outputPaths = outputPaths
+      tc.renderType = renderType
+      tc.message = message
+      tc.duration = duration
       if (result) tc.result = result
     }
   }
 
-  function failToolCall(toolName: string, result?: Record<string, any>, errorMessage?: string): void {
-    const tc = toolCalls.value.find(t => t.toolName === toolName && t.status === 'calling')
+  function failToolCall(toolCallId: string, toolName: string, message?: string): void {
+    const tc = toolCalls.value.find(t => t.toolCallId === toolCallId && t.status === 'calling')
     if (tc) {
       tc.status = 'failed'
-      if (result) tc.result = result
-      if (errorMessage) tc.result = { ...tc.result, error: errorMessage }
+      tc.label = buildFailedLabel(toolName, message)
+      if (message) tc.message = message
     }
   }
 
@@ -74,8 +83,6 @@ export function useAgentState() {
     agentFiles.value = []
     isDone.value = false
     errorMessage.value = null
-    failedStep.value = null
-    cancelledStep.value = null
   }
 
   function cancelStreaming(): void {
@@ -95,8 +102,6 @@ export function useAgentState() {
     agentFiles,
     isDone,
     errorMessage,
-    failedStep,
-    cancelledStep,
     currentToolCall,
     isCompleted,
     appendThinking,

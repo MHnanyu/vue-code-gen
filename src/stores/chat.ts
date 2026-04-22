@@ -55,7 +55,7 @@ export const useChatStore = defineStore('chat', () => {
     const session = currentSession.value
     if (!session) return false
     return session.messages.some(
-      m => m.role === 'assistant' && m.stepMessages && m.stepMessages.length > 0,
+      m => m.role === 'assistant' && ((m.stepMessages && m.stepMessages.length > 0) || (m.toolCalls && m.toolCalls.length > 0)),
     )
   })
 

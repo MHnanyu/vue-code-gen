@@ -33,7 +33,7 @@
 
           <template v-else-if="message.role === 'assistant'">
             <AgentMessageBubble
-              v-if="isAgentMode && (message.agentMetadata || message.content === '正在生成中...' || message.content === 'Agent 模式生成完成' || message.content.startsWith('Agent 执行异常') || message.content === '用户取消了生成')"
+              v-if="isAgentMode && (message.agentMetadata || message.toolCalls?.length || message.content === '正在生成中...' || message.content === 'Agent 模式生成完成' || message.content.startsWith('Agent 执行异常') || message.content === '用户取消了生成')"
               :message="message"
               @view-output="handleViewOutput"
               @retry="agent.retryAgentGeneration()"
@@ -242,7 +242,15 @@ function handleViewOutput(url: string) {
   for (const msg of [...session.messages].reverse()) {
     if (msg.agentMetadata?.toolCalls?.length) {
       for (const tc of msg.agentMetadata.toolCalls) {
-        if (tc.outputUrls?.includes(url)) {
+        if (tc.outputPaths?.includes(url)) {
+          chatStore.setActiveStageTab(tc.toolName)
+          return
+        }
+      }
+    }
+    if (msg.toolCalls?.length) {
+      for (const tc of msg.toolCalls) {
+        if (tc.outputPaths?.includes(url)) {
           chatStore.setActiveStageTab(tc.toolName)
           return
         }

@@ -43,7 +43,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, computed, watch, onUnmounted, shallowRef } from 'vue'
 import { Loading } from '@element-plus/icons-vue'
 import { Repl, useStore, useVueImportMap } from '@vue/repl'
 import CodeMirror from '@vue/repl/codemirror-editor'
@@ -87,6 +87,12 @@ const previewOptions = {
 
 const { exportStaticHtml } = useExportHtml()
 
+const filesSnapshot = shallowRef<string | null>(null)
+
+function computeFilesSnapshot(): string {
+  return props.files.map(f => `${f.path}::${(f.content || '')}`).join('\x00')
+}
+
 function syncFilesToRepl() {
   const newFiles = buildReplFiles(props.files)
   if (!newFiles) {
@@ -104,10 +110,11 @@ onUnmounted(() => {
   isReplReady.value = false
 })
 
-watch(() => props.files, () => {
+watch(computeFilesSnapshot, (newSnapshot) => {
   if (!isMounted) return
+  filesSnapshot.value = newSnapshot
   syncFilesToRepl()
-}, { deep: true, immediate: true })
+}, { immediate: true })
 
 defineExpose({
   exportStaticHtml,

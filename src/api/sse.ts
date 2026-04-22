@@ -8,7 +8,6 @@ import type {
   AgentThinkingEvent,
   AgentToolCallStartEvent,
   AgentToolCallResultEvent,
-  AgentToolCallErrorEvent,
   AgentDoneEvent,
   AgentFilesEvent,
   AgentCancelledEvent,
@@ -29,7 +28,6 @@ export interface AgentSSECallbacks {
   onAgentThinking?: (event: AgentThinkingEvent) => void
   onToolCallStart?: (event: AgentToolCallStartEvent) => void
   onToolCallResult?: (event: AgentToolCallResultEvent) => void
-  onToolCallError?: (event: AgentToolCallErrorEvent) => void
   onAgentDone?: (event: AgentDoneEvent) => void
   onAgentFiles?: (event: AgentFilesEvent) => void
   onAgentCancelled?: (event: AgentCancelledEvent) => void
@@ -78,6 +76,8 @@ export async function fetchSSEStream(
           } catch {
             console.warn('Failed to parse SSE data:', dataStr)
           }
+          currentEventType = ''
+        } else if (line === '') {
           currentEventType = ''
         }
       }
@@ -130,6 +130,8 @@ export async function fetchAgentSSEStream(
             console.warn('Failed to parse agent SSE data:', dataStr)
           }
           currentEventType = ''
+        } else if (line === '') {
+          currentEventType = ''
         }
       }
     }
@@ -179,9 +181,6 @@ function dispatchAgentEvent(
       break
     case 'tool_call_result':
       callbacks.onToolCallResult?.(data as AgentToolCallResultEvent)
-      break
-    case 'tool_call_error':
-      callbacks.onToolCallError?.(data as AgentToolCallErrorEvent)
       break
     case 'agent_done':
       callbacks.onAgentDone?.(data as AgentDoneEvent)

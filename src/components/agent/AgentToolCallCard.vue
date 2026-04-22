@@ -1,17 +1,18 @@
 <template>
   <div class="mb-2">
     <div
-      class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm border transition-all duration-200"
+      class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm border transition-all duration-300"
       :class="statusClass"
     >
       <el-icon v-if="status === 'calling'" class="is-loading"><Loading /></el-icon>
       <el-icon v-else-if="status === 'completed'" class="text-green-500"><CircleCheck /></el-icon>
       <el-icon v-else-if="status === 'failed'" class="text-red-500"><CircleClose /></el-icon>
-      <span>{{ label }}</span>
-      <template v-if="outputUrls.length > 0">
+      <span class="transition-all duration-300">{{ label }}</span>
+      <span v-if="duration != null && status === 'completed'" class="text-gray-400">{{ duration.toFixed(1) }}s</span>
+      <template v-if="outputPaths && outputPaths.length > 0 && status === 'completed'">
         <span
           class="text-xs text-blue-500 cursor-pointer hover:underline"
-          @click="$emit('view-output', outputUrls[0])"
+          @click="$emit('view-output', outputPaths[0])"
         >
           查看产物
         </span>
@@ -28,8 +29,9 @@ const props = defineProps<{
   toolName: string
   label: string
   status: 'calling' | 'completed' | 'failed'
-  outputUrls: string[]
-  outputType: 'file' | 'files' | null
+  outputPaths: string[] | null
+  renderType: 'text' | 'code' | null
+  duration?: number
 }>()
 
 defineEmits<{

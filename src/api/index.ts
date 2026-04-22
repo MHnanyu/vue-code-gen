@@ -1,6 +1,6 @@
 import type { ProjectFile, ComponentLib, SessionMode, Stages, StepMessage, AgentToolCallRecord } from '@/types'
 
-export const API_BASE = 'http://localhost:8000'
+export const API_BASE = 'http://localhost:8001'
 
 interface ApiResponse<T> {
   code: number
@@ -118,7 +118,6 @@ interface GenerateAgentRequest {
   componentLib?: ComponentLib
   attachments?: Attachment[]
   debug?: boolean
-  fromStep?: number
 }
 
 export async function getSessions(page = 1, pageSize = 20): Promise<SessionListResponse> {

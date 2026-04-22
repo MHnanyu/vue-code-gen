@@ -18,11 +18,11 @@ export default defineConfig({
     open: true,
     proxy: {
       '/api/generate': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:8001',
         changeOrigin: true,
       },
       '/output': {
-        target: 'http://localhost:8000',
+        target: 'http://localhost:8001',
         changeOrigin: true,
       },
     },

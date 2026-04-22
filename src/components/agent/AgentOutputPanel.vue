@@ -83,7 +83,7 @@ const contentTabs = computed<ContentTab[]>(() => {
         type: content.type,
         status: tc.status,
       })
-    } else if (tc.status === 'calling') {
+    } else if (tc.status === 'calling' || (tc.status === 'completed' && tc.renderType)) {
       tabs.push({
         key: toolName,
         label: tc.label || toolName,

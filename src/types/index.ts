@@ -46,7 +46,10 @@ export interface AgentToolCallRecord {
   arguments: string
   status: 'success' | 'failed'
   result: Record<string, any>
-  duration: number
+  message?: string
+  outputPaths?: string[] | null
+  renderType?: 'text' | 'code' | null
+  duration?: number
   timestamp: string
 }
 
@@ -56,11 +59,12 @@ export interface AgentMessageMetadata {
     toolName: string
     label: string
     status: 'calling' | 'completed' | 'failed'
-    step: number
-    outputUrls: string[]
-    outputType: 'file' | 'files' | null
+    outputPaths: string[] | null
+    renderType: 'text' | 'code' | null
     arguments?: string
     result?: Record<string, any>
+    message?: string
+    duration?: number
   }[]
   files?: {
     name: string
@@ -129,33 +133,27 @@ export interface StageProgressState {
 
 export interface AgentThinkingEvent {
   content: string
-  step: number
-  taskId: string
+  taskId?: string
   timestamp: string
 }
 
 export interface AgentToolCallStartEvent {
+  toolCallId: string
   toolName: string
   arguments: string
-  step: number
   timestamp: string
 }
 
 export interface AgentToolCallResultEvent {
+  toolCallId: string
   toolName: string
-  result: Record<string, any>
-  step: number
-  outputUrls: string[]
-  outputType: 'file' | 'files' | null
-  timestamp: string
-  error?: string
-  status?: 'success' | 'failed'
-}
-
-export interface AgentToolCallErrorEvent {
-  toolName: string
-  step: number
-  error: string
+  arguments: string | null
+  status: 'success' | 'failed'
+  result: Record<string, any> | null
+  message: string | null
+  outputPaths: string[] | null
+  renderType: 'text' | 'code' | null
+  duration: number | null
   timestamp: string
 }
 
@@ -168,7 +166,7 @@ export interface AgentFileSummary {
   name: string
   path: string
   lines: number
-  size_bytes: number
+  sizeBytes: number
 }
 
 export interface AgentFilesEvent {
@@ -185,27 +183,25 @@ export interface AgentFileItem {
 }
 
 export interface AgentCancelledEvent {
-  cancelledAtStep: number
   timestamp: string
 }
 
 export interface AgentErrorEvent {
   code: number
   message: string
-  failedStep: number | null
-  stages: Record<string, any>
   timestamp: string
 }
 
 export interface AgentToolCallState {
+  toolCallId: string
   toolName: string
   status: 'calling' | 'completed' | 'failed'
-  step: number
   label: string
-  outputUrls: string[]
-  outputType: 'file' | 'files' | null
+  outputPaths: string[] | null
+  renderType: 'text' | 'code' | null
   arguments?: string
   result?: Record<string, any>
+  message?: string
   duration?: number
 }
 

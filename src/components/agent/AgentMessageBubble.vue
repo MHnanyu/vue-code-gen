@@ -6,8 +6,9 @@
           :tool-name="tc.toolName"
           :label="tc.label"
           :status="tc.status"
-          :output-urls="tc.outputUrls"
-          :output-type="tc.outputType"
+          :output-paths="tc.outputPaths"
+          :render-type="tc.renderType"
+          :duration="tc.duration"
           @view-output="(url: string) => emit('view-output', url)"
         />
       </template>
@@ -81,7 +82,7 @@
 import { computed } from 'vue'
 import { CircleCheck, CircleClose } from '@element-plus/icons-vue'
 import type { ChatMessage, AgentMessageMetadata, AgentToolCallRecord, StepMessage } from '@/types'
-import { AGENT_TOOL_LABELS } from '@/constants/agent'
+import { AGENT_TOOL_LABELS, buildCompletedLabel } from '@/constants/agent'
 import AgentToolCallCard from '@/components/agent/AgentToolCallCard.vue'
 
 const props = defineProps<{
@@ -105,8 +106,8 @@ interface DisplayToolCall {
   toolName: string
   label: string
   status: 'calling' | 'completed' | 'failed'
-  outputUrls: string[]
-  outputType: 'file' | 'files' | null
+  outputPaths: string[] | null
+  renderType: 'text' | 'code' | null
 }
 
 const displayToolCalls = computed<DisplayToolCall[]>(() => {
@@ -115,20 +116,23 @@ const displayToolCalls = computed<DisplayToolCall[]>(() => {
       toolName: tc.toolName,
       label: tc.label,
       status: tc.status as 'calling' | 'completed' | 'failed',
-      outputUrls: tc.outputUrls,
-      outputType: tc.outputType,
+      outputPaths: tc.outputPaths ?? null,
+      renderType: tc.renderType ?? null,
     }))
   }
 
   if (props.message.toolCalls?.length) {
     return props.message.toolCalls.map((tc: AgentToolCallRecord) => {
-      const sm = stepMessages.value.find(s => s.stageName === tc.toolName)
+      const isCompleted = tc.status === 'success'
+      const label = isCompleted
+        ? buildCompletedLabel(tc.toolName, tc.result, tc.message, tc.outputPaths, tc.duration)
+        : AGENT_TOOL_LABELS[tc.toolName] || tc.toolName
       return {
         toolName: tc.toolName,
-        label: AGENT_TOOL_LABELS[tc.toolName] || tc.toolName,
+        label,
         status: (tc.status === 'success' ? 'completed' : 'failed') as 'completed' | 'failed',
-        outputUrls: sm?.filePath || [],
-        outputType: sm?.fileCategory || null,
+        outputPaths: tc.outputPaths ?? null,
+        renderType: tc.renderType ?? null,
       }
     })
   }
@@ -164,6 +168,9 @@ const displayContent = computed(() => {
 const bubbleContent = computed(() => {
   if (metadata.thinkingContent) {
     return metadata.thinkingContent
+  }
+  if (props.message.content && props.message.role === 'assistant' && !props.message.agentMetadata) {
+    return props.message.content
   }
   return ''
 })
