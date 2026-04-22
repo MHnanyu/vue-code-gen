@@ -1,14 +1,7 @@
 <template>
   <div>
-    <div class="mb-2">
-      <AgentThinkingBubble
-        v-if="metadata.thinkingContent"
-        :thinking-content="metadata.thinkingContent"
-      />
-    </div>
-
-    <div class="mb-2" v-if="metadata.toolCalls.length > 0">
-      <template v-for="(tc, idx) in metadata.toolCalls" :key="idx">
+    <div class="mb-2" v-if="displayToolCalls.length > 0">
+      <template v-for="(tc, idx) in displayToolCalls" :key="idx">
         <AgentToolCallCard
           :tool-name="tc.toolName"
           :label="tc.label"
@@ -59,13 +52,20 @@
       </div>
       <div class="max-w-[80%]">
         <div
+          v-if="bubbleContent"
+          class="px-4 py-3 rounded-xl leading-relaxed break-words whitespace-pre-wrap bg-gray-50 border border-gray-200 text-sm text-gray-600"
+        >
+          {{ bubbleContent }}
+        </div>
+        <div
+          v-else
           class="px-4 py-3 rounded-xl leading-relaxed break-words"
           :class="statusContentClass"
         >
           {{ displayContent }}
         </div>
-        <div v-if="metadata.files && metadata.files.length > 0" class="mt-1 text-xs text-gray-400">
-          共 {{ metadata.files.length }} 个文件
+        <div v-if="fileCount > 0" class="mt-1 text-xs text-gray-400">
+          共 {{ fileCount }} 个文件
         </div>
         <div v-if="isFailedOrCancelled" class="mt-2">
           <el-button size="small" type="primary" text @click="emit('retry')">
@@ -80,8 +80,8 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { CircleCheck, CircleClose } from '@element-plus/icons-vue'
-import type { ChatMessage, AgentMessageMetadata, StepMessage } from '@/types'
-import AgentThinkingBubble from '@/components/agent/AgentThinkingBubble.vue'
+import type { ChatMessage, AgentMessageMetadata, AgentToolCallRecord, StepMessage } from '@/types'
+import { AGENT_TOOL_LABELS } from '@/constants/agent'
 import AgentToolCallCard from '@/components/agent/AgentToolCallCard.vue'
 
 const props = defineProps<{
@@ -101,7 +101,42 @@ const metadata: AgentMessageMetadata = props.message.agentMetadata || {
 
 const stepMessages = computed<StepMessage[]>(() => props.message.stepMessages || [])
 
-const showToolCallCards = computed(() => metadata.toolCalls.length > 0)
+interface DisplayToolCall {
+  toolName: string
+  label: string
+  status: 'calling' | 'completed' | 'failed'
+  outputUrls: string[]
+  outputType: 'file' | 'files' | null
+}
+
+const displayToolCalls = computed<DisplayToolCall[]>(() => {
+  if (props.message.agentMetadata?.toolCalls?.length) {
+    return props.message.agentMetadata.toolCalls.map(tc => ({
+      toolName: tc.toolName,
+      label: tc.label,
+      status: tc.status as 'calling' | 'completed' | 'failed',
+      outputUrls: tc.outputUrls,
+      outputType: tc.outputType,
+    }))
+  }
+
+  if (props.message.toolCalls?.length) {
+    return props.message.toolCalls.map((tc: AgentToolCallRecord) => {
+      const sm = stepMessages.value.find(s => s.stageName === tc.toolName)
+      return {
+        toolName: tc.toolName,
+        label: AGENT_TOOL_LABELS[tc.toolName] || tc.toolName,
+        status: (tc.status === 'success' ? 'completed' : 'failed') as 'completed' | 'failed',
+        outputUrls: sm?.filePath || [],
+        outputType: sm?.fileCategory || null,
+      }
+    })
+  }
+
+  return []
+})
+
+const showToolCallCards = computed(() => displayToolCalls.value.length > 0)
 
 const isFailedOrCancelled = computed(() =>
   props.message.content.startsWith('Agent 执行异常') ||
@@ -109,23 +144,28 @@ const isFailedOrCancelled = computed(() =>
   props.message.content === '正在生成中...',
 )
 
+const fileCount = computed(() => {
+  return props.message.agentMetadata?.files?.length || 0
+})
+
 const displayContent = computed(() => {
   const c = props.message.content
-  if (c === 'Agent 模式生成完成') {
-    return metadata.files && metadata.files.length > 0
-      ? `生成完成，共 ${metadata.files.length} 个文件`
-      : c
-  }
-  if (c === '正在生成中...') {
-    return '生成中断（页面刷新或连接断开）'
-  }
-  if (c.startsWith('Agent 执行异常:')) {
-    return c
-  }
-  if (c === '用户取消了生成') {
-    return c
+  if (props.message.agentMetadata) {
+    if (c === 'Agent 模式生成完成' && fileCount.value > 0) {
+      return `生成完成，共 ${fileCount.value} 个文件`
+    }
+    if (c === '正在生成中...') {
+      return '生成中断（页面刷新或连接断开）'
+    }
   }
   return c
+})
+
+const bubbleContent = computed(() => {
+  if (metadata.thinkingContent) {
+    return metadata.thinkingContent
+  }
+  return ''
 })
 
 const statusContentClass = computed(() => {

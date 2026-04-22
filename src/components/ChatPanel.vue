@@ -156,7 +156,6 @@ import AgentMessageBubble from '@/components/agent/AgentMessageBubble.vue'
 import { useStageProgress } from '@/composables/useStageProgress'
 import { useGeneration } from '@/composables/useGeneration'
 import { useAgentGeneration } from '@/composables/useAgentGeneration'
-import { fetchStageFile } from '@/api'
 
 defineProps<{
   historyCollapsed?: boolean
@@ -237,11 +236,25 @@ function handleStageClick(stage: StageProgressState, message?: ChatMessage) {
 }
 
 function handleViewOutput(url: string) {
-  fetchStageFile(url).then(content => {
-    console.log('[Agent Output]', content)
-  }).catch(e => {
-    console.error('Failed to load output:', e)
-  })
+  const session = chatStore.currentSession
+  if (!session) return
+
+  for (const msg of [...session.messages].reverse()) {
+    if (msg.agentMetadata?.toolCalls?.length) {
+      for (const tc of msg.agentMetadata.toolCalls) {
+        if (tc.outputUrls?.includes(url)) {
+          chatStore.setActiveStageTab(tc.toolName)
+          return
+        }
+      }
+    }
+    for (const sm of (msg.stepMessages || [])) {
+      if (sm.filePath?.includes(url)) {
+        chatStore.setActiveStageTab(sm.stageName)
+        return
+      }
+    }
+  }
 }
 
 const showPendingLoading = computed(() => {

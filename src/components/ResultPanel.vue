@@ -70,7 +70,11 @@
       <CodeEditorPanel v-else-if="activeTab === 'code'" />
 
       <StageOutputPanel
-        v-show="activeTab === 'stages'"
+        v-show="activeTab === 'stages' && !showAgentOutput"
+      />
+
+      <AgentOutputPanel
+        v-show="activeTab === 'stages' && showAgentOutput"
       />
     </template>
   </div>
@@ -91,6 +95,7 @@ import { getCcuiComponentsAsProjectFiles } from '@/templates/ccui-components'
 import CodeEditorPanel from '@/components/CodeEditorPanel.vue'
 import VueReplPreview from '@/components/VueReplPreview.vue'
 import StageOutputPanel from '@/components/StageOutputPanel.vue'
+import AgentOutputPanel from '@/components/agent/AgentOutputPanel.vue'
 import type { ProjectFile, ComponentLib } from '@/types'
 import JSZip from 'jszip'
 
@@ -99,11 +104,18 @@ const projectStore = useProjectStore()
 const chatStore = useChatStore()
 const activeTab = ref('preview')
 const isSaving = ref(false)
+const agentState = chatStore.agentState
 const hasStageContent = computed(() => {
   return chatStore.isStreaming || chatStore.hasStepMessages
+    || (agentState.isStreaming && agentState.toolCalls.length > 0)
+    || agentState.toolCallContents.size > 0
 })
 const replPreviewRef = ref<InstanceType<typeof VueReplPreview> | null>(null)
 const hasFiles = computed(() => projectStore.files.length > 0)
+
+const showAgentOutput = computed(() => {
+  return (agentState.isStreaming && agentState.toolCalls.length > 0) || agentState.toolCallContents.size > 0
+})
 
 const componentLibLabel = computed(() => {
   const session = chatStore.currentSession
@@ -176,6 +188,12 @@ watch(() => chatStore.activeStageTab, (key) => {
     activeTab.value = 'stages'
   }
 }, { flush: 'sync' })
+
+watch(() => agentState.toolCalls.length, (len, prevLen) => {
+  if (len > (prevLen || 0) && hasStageContent.value) {
+    activeTab.value = 'stages'
+  }
+})
 
 watch(() => chatStore.currentSessionId, () => {
   if (activeTab.value === 'stages') {

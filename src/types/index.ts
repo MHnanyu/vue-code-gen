@@ -146,7 +146,16 @@ export interface AgentToolCallResultEvent {
   result: Record<string, any>
   step: number
   outputUrls: string[]
-  outputType: 'file' | 'files'
+  outputType: 'file' | 'files' | null
+  timestamp: string
+  error?: string
+  status?: 'success' | 'failed'
+}
+
+export interface AgentToolCallErrorEvent {
+  toolName: string
+  step: number
+  error: string
   timestamp: string
 }
 

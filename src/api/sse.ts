@@ -8,6 +8,7 @@ import type {
   AgentThinkingEvent,
   AgentToolCallStartEvent,
   AgentToolCallResultEvent,
+  AgentToolCallErrorEvent,
   AgentDoneEvent,
   AgentFilesEvent,
   AgentCancelledEvent,
@@ -28,6 +29,7 @@ export interface AgentSSECallbacks {
   onAgentThinking?: (event: AgentThinkingEvent) => void
   onToolCallStart?: (event: AgentToolCallStartEvent) => void
   onToolCallResult?: (event: AgentToolCallResultEvent) => void
+  onToolCallError?: (event: AgentToolCallErrorEvent) => void
   onAgentDone?: (event: AgentDoneEvent) => void
   onAgentFiles?: (event: AgentFilesEvent) => void
   onAgentCancelled?: (event: AgentCancelledEvent) => void
@@ -177,6 +179,9 @@ function dispatchAgentEvent(
       break
     case 'tool_call_result':
       callbacks.onToolCallResult?.(data as AgentToolCallResultEvent)
+      break
+    case 'tool_call_error':
+      callbacks.onToolCallError?.(data as AgentToolCallErrorEvent)
       break
     case 'agent_done':
       callbacks.onAgentDone?.(data as AgentDoneEvent)

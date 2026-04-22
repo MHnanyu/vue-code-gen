@@ -3,12 +3,19 @@ import { cancelGeneration as apiCancelGeneration } from '@/api'
 import type { AgentToolCallState } from '@/types'
 import { AGENT_TOOL_LABELS } from '@/constants/agent'
 
+export interface ToolCallContent {
+  type: 'markdown' | 'vue'
+  content: string | null
+  files: any[] | null
+}
+
 export function useAgentState() {
   const isStreaming = ref(false)
   const isRetrying = ref(false)
   const currentTaskId = ref<string | null>(null)
   const thinkingContent = ref('')
   const toolCalls = ref<AgentToolCallState[]>([])
+  const toolCallContents = ref<Map<string, ToolCallContent>>(new Map())
   const agentFiles = ref<any[]>([])
   const isDone = ref(false)
   const errorMessage = ref<string | null>(null)
@@ -47,16 +54,23 @@ export function useAgentState() {
     }
   }
 
-  function failToolCall(toolName: string): void {
+  function failToolCall(toolName: string, result?: Record<string, any>, errorMessage?: string): void {
     const tc = toolCalls.value.find(t => t.toolName === toolName && t.status === 'calling')
     if (tc) {
       tc.status = 'failed'
+      if (result) tc.result = result
+      if (errorMessage) tc.result = { ...tc.result, error: errorMessage }
     }
+  }
+
+  function setToolCallContent(toolName: string, content: ToolCallContent): void {
+    toolCallContents.value.set(toolName, content)
   }
 
   function reset(): void {
     thinkingContent.value = ''
     toolCalls.value = []
+    toolCallContents.value.clear()
     agentFiles.value = []
     isDone.value = false
     errorMessage.value = null
@@ -77,6 +91,7 @@ export function useAgentState() {
     currentTaskId,
     thinkingContent,
     toolCalls,
+    toolCallContents,
     agentFiles,
     isDone,
     errorMessage,
@@ -87,6 +102,7 @@ export function useAgentState() {
     appendThinking,
     addToolCall,
     completeToolCall,
+    setToolCallContent,
     failToolCall,
     reset,
     cancelStreaming,

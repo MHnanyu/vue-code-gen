@@ -5,8 +5,6 @@
         <el-avatar :size="32" style="background: #e6a23c">AI</el-avatar>
       </div>
       <div class="flex-1 min-w-0 max-w-[80%]">
-        <AgentThinkingBubble :thinking-content="thinkingContent" />
-
         <template v-for="(tc, idx) in toolCalls" :key="idx">
           <AgentToolCallCard
             :tool-name="tc.toolName"
@@ -23,7 +21,11 @@
           <span class="ml-2 text-gray-500">正在思考...</span>
         </div>
 
-        <div v-if="isDone" class="px-4 py-3 rounded-xl bg-gray-100 inline-flex items-center text-green-600">
+        <div v-if="bubbleContent" class="px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-sm text-gray-600 leading-relaxed whitespace-pre-wrap break-words">
+          {{ bubbleContent }}
+        </div>
+
+        <div v-if="isDone && !bubbleContent" class="px-4 py-3 rounded-xl bg-gray-100 inline-flex items-center text-green-600">
           <el-icon><CircleCheck /></el-icon>
           <span class="ml-2">生成完成，正在加载代码...</span>
         </div>
@@ -60,12 +62,12 @@
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
 import { Loading, CircleCheck } from '@element-plus/icons-vue'
 import type { AgentToolCallState } from '@/types'
-import AgentThinkingBubble from '@/components/agent/AgentThinkingBubble.vue'
 import AgentToolCallCard from '@/components/agent/AgentToolCallCard.vue'
 
-defineProps<{
+const props = defineProps<{
   isStreaming: boolean
   thinkingContent: string
   toolCalls: AgentToolCallState[]
@@ -78,4 +80,10 @@ const emit = defineEmits<{
   'view-output': [url: string]
   'retry': []
 }>()
+
+const bubbleContent = computed(() => {
+  if (props.errorMessage) return ''
+  if (props.isDone) return ''
+  return props.thinkingContent
+})
 </script>

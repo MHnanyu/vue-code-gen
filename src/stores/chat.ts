@@ -190,7 +190,7 @@ export const useChatStore = defineStore('chat', () => {
     const msgs = session.messages
     const lastIdx = msgs.length - 1
     if (lastIdx < 0 || msgs[lastIdx].role !== 'assistant') return
-    if (onlyIfFailed && msgs[lastIdx].failedStep == null) return
+    if (onlyIfFailed && msgs[lastIdx].failedStep == null && !msgs[lastIdx].content.startsWith('Agent 执行异常') && msgs[lastIdx].content !== '用户取消了生成') return
     msgs.splice(lastIdx, 1)
   }
 

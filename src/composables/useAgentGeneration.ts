@@ -33,11 +33,64 @@ export function useAgentGeneration(scrollToBottom: () => void) {
       },
 
       async onToolCallResult(event) {
-        if (event.outputUrls && event.outputUrls.length > 0 && AGENT_OUTPUT_URL_TOOLS.has(event.toolName)) {
+        const isFailed = event.status === 'failed' || !!event.error || !!event.result?.error
+
+        if (isFailed) {
+          agentState.failToolCall(event.toolName, event.result, event.error || event.result?.error)
+          scrollToBottom()
+          return
+        }
+
+        const hasOutput = event.outputUrls && event.outputUrls.length > 0 && AGENT_OUTPUT_URL_TOOLS.has(event.toolName)
+        if (hasOutput) {
           agentState.completeToolCall(event.toolName, event.outputUrls, event.outputType, event.result)
+
+          if (event.outputType === 'file') {
+            try {
+              const content = await fetchStageFile(event.outputUrls[0])
+              agentState.setToolCallContent(event.toolName, { type: 'markdown', content, files: null })
+            } catch (e) {
+              console.error(`Failed to fetch agent tool output for ${event.toolName}:`, e)
+            }
+          } else if (event.outputType === 'files') {
+            try {
+              const fetchResults = await Promise.allSettled(
+                event.outputUrls.map(async (url) => {
+                  const code = await fetchStageFile(url)
+                  const fileName = url.split('/').pop() || 'Unknown.vue'
+                  return {
+                    id: `agent_${url}`,
+                    name: fileName,
+                    path: url,
+                    type: 'file' as const,
+                    language: 'vue' as const,
+                    content: code,
+                  }
+                }),
+              )
+              const apiFiles = fetchResults
+                .filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled')
+                .map(r => r.value)
+
+              agentState.setToolCallContent(event.toolName, { type: 'vue', content: null, files: apiFiles })
+
+              const projectStore = useProjectStore()
+              projectStore.setFilesFromApiFiles(apiFiles, chatStore.currentSession?.componentLib)
+              if (chatStore.currentSessionId) {
+                chatStore.updateSessionFiles(chatStore.currentSessionId, apiFiles)
+              }
+            } catch (e) {
+              console.error(`Failed to fetch agent tool files for ${event.toolName}:`, e)
+            }
+          }
         } else {
           agentState.completeToolCall(event.toolName, [], null, event.result)
         }
+        scrollToBottom()
+      },
+
+      onToolCallError(event) {
+        agentState.failToolCall(event.toolName, { error: event.error }, event.error)
         scrollToBottom()
       },
 
