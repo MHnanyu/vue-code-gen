@@ -86,7 +86,9 @@ export function buildCompletedLabel(
   message?: string,
   outputPaths?: string[] | null,
   _duration?: number,
+  args?: string,
 ): string {
+  const argumentsJson = JSON.parse(args ?? '{}');
   switch (toolName) {
     case 'query_ux_spec': {
       if (result) {
@@ -96,9 +98,10 @@ export function buildCompletedLabel(
           result.results?.length ??
           result.data?.length ??
           0
-        if (count > 0) return `已查询 UX 规范，获取到 ${count} 条规范`
+        const argDetail = argumentsJson.topic && argumentsJson.spec_type ? `(${argumentsJson.topic} - ${argumentsJson.spec_type})` : ''
+        if (count > 0) return `已查询 UX 规范${argDetail}，获取到 ${count} 条规范`
         const summary = result.summary || result.description || result.title
-        if (summary) return `已查询 UX 规范：${truncate(summary, 40)}`
+        if (summary) return `已查询 UX 规范${argDetail}：${truncate(summary, 40)}`
       }
       if (message) return message
       return `已查询 UX 设计规范`

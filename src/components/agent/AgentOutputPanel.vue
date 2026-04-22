@@ -134,7 +134,7 @@ const contentTabs = computed<ContentTab[]>(() => {
             usedToolNames.add(tc.toolName)
 
             const label = tc.status === 'success'
-              ? buildCompletedLabel(tc.toolName, tc.result, tc.message, tc.outputPaths, tc.duration)
+              ? buildCompletedLabel(tc.toolName, tc.result, tc.message, tc.outputPaths, tc.duration, tc.arguments)
               : AGENT_TOOL_LABELS[tc.toolName] || tc.toolName
             const type = getOutputType(tc.toolName, tc.renderType)
             if (type) {

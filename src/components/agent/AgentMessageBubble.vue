@@ -9,6 +9,9 @@
           :output-paths="tc.outputPaths"
           :render-type="tc.renderType"
           :duration="tc.duration"
+          :arguments="tc.arguments"
+          :result="tc.result"
+          :message="tc.message"
           @view-output="(url: string) => emit('view-output', url)"
         />
       </template>
@@ -108,6 +111,10 @@ interface DisplayToolCall {
   status: 'calling' | 'completed' | 'failed'
   outputPaths: string[] | null
   renderType: 'text' | 'code' | null
+  duration?: number
+  arguments?: string
+  result?: Record<string, any> | string | null
+  message?: string | null
 }
 
 const displayToolCalls = computed<DisplayToolCall[]>(() => {
@@ -118,6 +125,10 @@ const displayToolCalls = computed<DisplayToolCall[]>(() => {
       status: tc.status as 'calling' | 'completed' | 'failed',
       outputPaths: tc.outputPaths ?? null,
       renderType: tc.renderType ?? null,
+      duration: tc.duration,
+      arguments: tc.arguments,
+      result: tc.result,
+      message: tc.message,
     }))
   }
 
@@ -125,7 +136,7 @@ const displayToolCalls = computed<DisplayToolCall[]>(() => {
     return props.message.toolCalls.map((tc: AgentToolCallRecord) => {
       const isCompleted = tc.status === 'success'
       const label = isCompleted
-        ? buildCompletedLabel(tc.toolName, tc.result, tc.message, tc.outputPaths, tc.duration)
+        ? buildCompletedLabel(tc.toolName, tc.result, tc.message, tc.outputPaths, tc.duration, tc.arguments)
         : AGENT_TOOL_LABELS[tc.toolName] || tc.toolName
       return {
         toolName: tc.toolName,
@@ -133,6 +144,10 @@ const displayToolCalls = computed<DisplayToolCall[]>(() => {
         status: (tc.status === 'success' ? 'completed' : 'failed') as 'completed' | 'failed',
         outputPaths: tc.outputPaths ?? null,
         renderType: tc.renderType ?? null,
+        duration: tc.duration,
+        arguments: tc.arguments,
+        result: tc.result,
+        message: tc.message,
       }
     })
   }

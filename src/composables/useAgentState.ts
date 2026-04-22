@@ -47,6 +47,7 @@ export function useAgentState() {
     toolName: string,
     outputPaths: string[] | null,
     renderType: 'text' | 'code' | null,
+    args?: string,
     result?: Record<string, any>,
     message?: string,
     duration?: number,
@@ -54,7 +55,7 @@ export function useAgentState() {
     const tc = toolCalls.value.find(t => t.toolCallId === toolCallId && t.status === 'calling')
     if (tc) {
       tc.status = 'completed'
-      tc.label = buildCompletedLabel(toolName, result, message, outputPaths, duration)
+      tc.label = buildCompletedLabel(toolName, result, message, outputPaths, duration, args)
       tc.outputPaths = outputPaths
       tc.renderType = renderType
       tc.message = message

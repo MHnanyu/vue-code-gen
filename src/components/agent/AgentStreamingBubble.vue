@@ -13,6 +13,9 @@
             :output-paths="tc.outputPaths"
             :render-type="tc.renderType"
             :duration="tc.duration"
+            :arguments="tc.arguments"
+            :result="tc.result"
+            :message="tc.message"
             @view-output="(url: string) => emit('view-output', url)"
           />
         </template>
